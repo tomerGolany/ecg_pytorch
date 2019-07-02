@@ -10,19 +10,20 @@ from sklearn.metrics import roc_curve, auc
 from sklearn.utils.multiclass import unique_labels
 from sklearn.metrics import confusion_matrix
 from ecg_pytorch.classifiers.models import lstm
-import time
+from ecg_pytorch.train_configs import ECGTrainConfig
+import logging
 
 
 def init_weights(m):
     if type(m) == nn.LSTM:
-       torch.nn.init.xavier_uniform(m.weight_hh_l0.data)
-       # torch.nn.init.xavier_uniform(m.weight_hh_l1.data)
-       torch.nn.init.xavier_uniform(m.weight_ih_l0.data)
-       # torch.nn.init.xavier_uniform(m.weight_ih_l1.data)
-       # torch.nn.init.xavier_uniform(m.bias_hh_l0.data)
-       # torch.nn.init.xavier_uniform(m.bias_hh_l1.data)
-       # torch.nn.init.xavier_uniform(m.bias_ih_l0.data)
-       # torch.nn.init.xavier_uniform(m.bias_ih_l1.data)
+        torch.nn.init.xavier_uniform(m.weight_hh_l0.data)
+        # torch.nn.init.xavier_uniform(m.weight_hh_l1.data)
+        torch.nn.init.xavier_uniform(m.weight_ih_l0.data)
+        # torch.nn.init.xavier_uniform(m.weight_ih_l1.data)
+        # torch.nn.init.xavier_uniform(m.bias_hh_l0.data)
+        # torch.nn.init.xavier_uniform(m.bias_hh_l1.data)
+        # torch.nn.init.xavier_uniform(m.bias_ih_l0.data)
+        # torch.nn.init.xavier_uniform(m.bias_ih_l1.data)
 
 
 def plt_roc_curve(y_true, y_pred, classes, writer, total_iters):
@@ -111,73 +112,78 @@ def plot_confusion_matrix(y_true, y_pred, classes,
     return fig, ax
 
 
-def train_classifier(net, batch_size, model_dir):
+def train_classifier(net, model_dir, train_config=None):
     """
 
     :param network:
     :return:
     """
+    batch_size = train_config.batch_size
+    num_of_epochs = train_config.num_epochs
+    lr = train_config.lr
 
     composed = transforms.Compose([ToTensor()])
     dataset = EcgHearBeatsDataset(transform=composed)
-    weights_for_balance = dataset.make_weights_for_balanced_classes()
-    weights_for_balance = torch.DoubleTensor(weights_for_balance)
-    sampler = torch.utils.data.sampler.WeightedRandomSampler(
-        weights=weights_for_balance,
-        num_samples=len(weights_for_balance),
-        replacement=True)
-    dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size,
-                                             num_workers=1, sampler=sampler)
-    # weights = dataset.weights_per_class()
-    # # weights[4] = 0
-    # weights = torch.Tensor(weights)
-    # print(weights)
-    # dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size,
-    #                                           num_workers=1, shuffle=True)
+    if train_config.weighted_sampling:
+        weights_for_balance = dataset.make_weights_for_balanced_classes()
+        weights_for_balance = torch.DoubleTensor(weights_for_balance)
+        sampler = torch.utils.data.sampler.WeightedRandomSampler(
+            weights=weights_for_balance,
+            num_samples=len(weights_for_balance),
+            replacement=True)
+        dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size,
+                                                 num_workers=1, sampler=sampler)
+    else:
+        # weights = dataset.weights_per_class()
+        # # weights[4] = 0
+        # weights = torch.Tensor(weights)
+        # print(weights)
+        dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size,
+                                                 num_workers=1, shuffle=True)
 
     testset = EcgHearBeatsDatasetTest(transform=composed)
     testdataloader = torch.utils.data.DataLoader(testset, batch_size=300,
-                                             shuffle=True, num_workers=1)
+                                                 shuffle=True, num_workers=1)
 
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.RMSprop(net.parameters(), lr=0.01)
+    optimizer = optim.RMSprop(net.parameters(), lr=lr)
     writer = SummaryWriter(model_dir)
     total_iters = 0
-    for epoch in range(2):  # loop over the dataset multiple times
-
+    for epoch in range(num_of_epochs):  # loop over the dataset multiple times
         for i, data in enumerate(dataloader):
             total_iters += 1
             # get the inputs
-            ecg_batch = data['cardiac_cycle'].permute(1, 0, 2).float()
-            b_size = ecg_batch.shape[1]
+            ecg_batch = data['cardiac_cycle'].float()
+            b_size = ecg_batch.shape[0]
             labels = data['label']
             labels_class = torch.max(labels, 1)[1]
+            labels_str = data['beat_type']
+            logging.debug("batch labels: {}".format(labels_str))
             # zero the parameter gradients
             net.zero_grad()
 
             # forward + backward + optimize
             outputs = net(ecg_batch)
-            # print("output from network: {}".format(outputs.data.numpy()))
             outputs_class = torch.max(outputs, 1)[1]
-            # print("output class from network: {}".format(outputs_class.data.numpy()))
             accuracy = (outputs_class == labels_class).sum().float() / b_size
             loss = criterion(outputs, torch.max(labels, 1)[1])
             loss.backward()
             optimizer.step()
-            writer.add_scalars('Cross entropy loss', {'Train batches loss': loss.item()}, total_iters)
-            writer.add_scalars('Accuracy', {'Train batches accuracy': accuracy.item()}, total_iters)
+            writer.add_scalars('cross_entropy_loss', {'Train batches loss': loss.item()}, total_iters)
+            writer.add_scalars('accuracy', {'Train batches accuracy': accuracy.item()}, total_iters)
             # print statistics
-            print("Epoch {}. Iteration {}.\t Batch loss = {:.2f}. Accuracy = {:.2f}".format(epoch + 1, i, loss.item(),
+            logging.info("Epoch {}. Iteration {}.\t Batch loss = {:.2f}. Accuracy = {:.2f}".format(epoch + 1, i, loss.item(),
                                                                                             accuracy.item()))
-            if i % 50 == 0:
-                fig, _ = plot_confusion_matrix(labels_class.numpy(), outputs_class.numpy(), np.array(['N', 'S', 'V', 'F', 'Q']))
+            if total_iters % 50 == 0:
+                fig, _ = plot_confusion_matrix(labels_class.numpy(), outputs_class.numpy(),
+                                               np.array(['N', 'S', 'V', 'F', 'Q']))
                 # fig, _ = plot_confusion_matrix(labels_class.numpy(), outputs_class.numpy(),
                 #                                np.array(['N', 'Others']))
                 writer.add_figure('train/confusion_matrix', fig, total_iters)
 
                 grad_norm = get_gradient_norm_l2(net)
                 writer.add_scalar('gradients_norm', grad_norm, total_iters)
-                print("Norm of gradients = {}.".format(grad_norm))
+                logging.info("Norm of gradients = {}.".format(grad_norm))
 
             if i % 1000 == 0:
                 with torch.no_grad():
@@ -189,8 +195,7 @@ def train_classifier(net, batch_size, model_dir):
                     outputs_total = np.array([])
                     loss_hist = []
                     for _, test_data in enumerate(testdataloader):
-                        start = time.time()
-                        ecg_batch = test_data['cardiac_cycle'].permute(1, 0, 2).float()
+                        ecg_batch = test_data['cardiac_cycle'].float()
                         labels = test_data['label']
 
                         labels_class = torch.max(labels, 1)[1]
@@ -198,8 +203,6 @@ def train_classifier(net, batch_size, model_dir):
                         loss = criterion(outputs, torch.max(labels, 1)[1])
                         loss_hist.append(loss.item())
                         outputs_class = torch.max(outputs, 1)[1]
-                        end = time.time()
-                        print("time took {}".format(end - start))
 
                         labels_total_one_hot = np.concatenate((labels_total_one_hot, labels.numpy()))
                         labels_total = np.concatenate((labels_total, labels_class.numpy()))
@@ -214,10 +217,10 @@ def train_classifier(net, batch_size, model_dir):
                     #                                np.array(['N', 'Other']))
                     # Accuracy and Loss:
                     accuracy = sum((outputs_total == labels_total)) / len(outputs_total)
-                    writer.add_scalars('Accuracy', {'Test set accuracy': accuracy}, global_step=total_iters)
+                    writer.add_scalars('accuracy', {'Test set accuracy': accuracy}, global_step=total_iters)
                     writer.add_figure('test/confusion_matrix', fig, total_iters)
                     loss = sum(loss_hist) / len(loss_hist)
-                    writer.add_scalars('Cross entropy loss', {'Test set loss': loss}, total_iters)
+                    writer.add_scalars('cross_entropy_loss', {'Test set loss': loss}, total_iters)
                     plt_roc_curve(labels_total_one_hot, outputs_preds, np.array(['N', 'S', 'V', 'F', 'Q']), writer, total_iters)
                     # plt_roc_curve(labels_total_one_hot, outputs_preds, np.array(['N', 'Others']), writer,
                     #               total_iters)
@@ -234,6 +237,7 @@ def get_gradient_norm_l2(model):
 
 
 if __name__ == "__main__":
-    net = lstm.ECGLSTM(5, 512,  5, 2)
-    # net.apply(init_weights)
-    train_classifier(net, 50, model_dir='tensorboard/lstm')
+    logging.basicConfig(level=logging.INFO)
+    net = lstm.ECGLSTM(5, 512, 5, 2)
+    train_config = ECGTrainConfig(num_epochs=4, batch_size=10, lr=0.002, weighted_loss=False, weighted_sampling=True)
+    train_classifier(net, model_dir='tensorboard/lstm_weighted_sampling', train_config=train_config)

@@ -1,5 +1,5 @@
 import torch.nn as nn
-
+import logging
 
 class ECGLSTM(nn.Module):
     def __init__(self, length_of_each_word, number_of_hidden_neurons,  num_of_classes, num_of_layers):
@@ -9,7 +9,7 @@ class ECGLSTM(nn.Module):
         self.num_hidden_neurons = number_of_hidden_neurons
         self.output_size = num_of_classes
         self.num_of_layesr = num_of_layers
-        self.lstm = nn.LSTM(length_of_each_word, number_of_hidden_neurons, num_of_layers)
+        self.lstm = nn.LSTM(length_of_each_word, number_of_hidden_neurons, num_of_layers, batch_first=True)
         self.output_layer = nn.Linear(number_of_hidden_neurons, num_of_classes)
 
     def forward(self, sentence):
@@ -21,7 +21,9 @@ class ECGLSTM(nn.Module):
         # Add the extra 2nd dimension
         # print("input shape: {}".format(sentence.shape))
         out, hidden = self.lstm(sentence)  # If (h_0, c_0) is not provided, both h_0 and c_0 default to zero.
-        last_output = out[-1]
+        # last_output = out[-1]
+        last_output = out[:, -1, :]
+        logging.debug("Shape of last output from LSTM: {}".format(last_output.shape))
         # print("out shape: {}".format(out.size()))
         # out dim should be - [len_of_sentence, batch_size, hidden_size]
         # reshaped_last_output = out[-1].view(-1, self.num_hidden_neurons)
