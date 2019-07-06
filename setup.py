@@ -1,7 +1,7 @@
 from setuptools import find_packages
 from setuptools import setup
 
-REQUIRED_PACKAGES = ['matplotlib', 'numpy']
+REQUIRED_PACKAGES = ['matplotlib', 'numpy', 'bokeh']
 
 setup(name='ecg_pytorch',
       version='0.1',
