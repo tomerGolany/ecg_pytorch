@@ -1,6 +1,7 @@
 import torch.nn as nn
 import logging
 
+
 class ECGLSTM(nn.Module):
     def __init__(self, length_of_each_word, number_of_hidden_neurons,  num_of_classes, num_of_layers):
         super(ECGLSTM, self).__init__()
