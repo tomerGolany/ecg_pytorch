@@ -12,6 +12,7 @@ from sklearn.metrics import confusion_matrix
 from ecg_pytorch.classifiers.models import lstm
 from ecg_pytorch.train_configs import ECGTrainConfig
 import logging
+import time
 
 
 def init_weights(m):
@@ -121,6 +122,7 @@ def train_classifier(net, model_dir, train_config=None):
     batch_size = train_config.batch_size
     num_of_epochs = train_config.num_epochs
     lr = train_config.lr
+    device = train_config.device
 
     composed = transforms.Compose([ToTensor()])
     dataset = EcgHearBeatsDataset(transform=composed)
@@ -146,16 +148,17 @@ def train_classifier(net, model_dir, train_config=None):
                                                  shuffle=True, num_workers=1)
 
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.RMSprop(net.parameters(), lr=lr)
+    optimizer = optim.Adam(net.parameters(), lr=lr)
     writer = SummaryWriter(model_dir)
     total_iters = 0
+    num_iters_per_epoch = int(np.floor(len(dataset) / batch_size) + batch_size)
     for epoch in range(num_of_epochs):  # loop over the dataset multiple times
         for i, data in enumerate(dataloader):
             total_iters += 1
             # get the inputs
-            ecg_batch = data['cardiac_cycle'].float()
+            ecg_batch = data['cardiac_cycle'].float().to(device)
             b_size = ecg_batch.shape[0]
-            labels = data['label']
+            labels = data['label'].to(device)
             labels_class = torch.max(labels, 1)[1]
             labels_str = data['beat_type']
             logging.debug("batch labels: {}".format(labels_str))
@@ -172,8 +175,10 @@ def train_classifier(net, model_dir, train_config=None):
             writer.add_scalars('cross_entropy_loss', {'Train batches loss': loss.item()}, total_iters)
             writer.add_scalars('accuracy', {'Train batches accuracy': accuracy.item()}, total_iters)
             # print statistics
-            logging.info("Epoch {}. Iteration {}.\t Batch loss = {:.2f}. Accuracy = {:.2f}".format(epoch + 1, i, loss.item(),
-                                                                                            accuracy.item()))
+            logging.info("Epoch {}. Iteration {}/{}.\t Batch loss = {:.2f}. Accuracy = {:.2f}".format(epoch + 1, i,
+                                                                                                      num_iters_per_epoch,
+                                                                                                      loss.item(),
+                                                                                                      accuracy.item()))
             if total_iters % 50 == 0:
                 fig, _ = plot_confusion_matrix(labels_class.numpy(), outputs_class.numpy(),
                                                np.array(['N', 'S', 'V', 'F', 'Q']))
@@ -185,7 +190,7 @@ def train_classifier(net, model_dir, train_config=None):
                 writer.add_scalar('gradients_norm', grad_norm, total_iters)
                 logging.info("Norm of gradients = {}.".format(grad_norm))
 
-            if i % 1000 == 0:
+            if total_iters % 1000 == 0:
                 with torch.no_grad():
                     labels_total_one_hot = np.array([]).reshape((0, 5))
                     outputs_preds = np.array([]).reshape((0, 5))
@@ -194,9 +199,10 @@ def train_classifier(net, model_dir, train_config=None):
                     labels_total = np.array([])
                     outputs_total = np.array([])
                     loss_hist = []
+                    start = time.time()
                     for _, test_data in enumerate(testdataloader):
-                        ecg_batch = test_data['cardiac_cycle'].float()
-                        labels = test_data['label']
+                        ecg_batch = test_data['cardiac_cycle'].float().to(device)
+                        labels = test_data['label'].to(device)
 
                         labels_class = torch.max(labels, 1)[1]
                         outputs = net(ecg_batch)
@@ -208,7 +214,8 @@ def train_classifier(net, model_dir, train_config=None):
                         labels_total = np.concatenate((labels_total, labels_class.numpy()))
                         outputs_total = np.concatenate((outputs_total, outputs_class.numpy()))
                         outputs_preds = np.concatenate((outputs_preds, outputs.numpy()))
-
+                    end = time.time()
+                    print("Test evaluation took {:.2f} seconds".format(end - start))
                     outputs_total = outputs_total.astype(int)
                     labels_total = labels_total.astype(int)
                     fig, _ = plot_confusion_matrix(labels_total, outputs_total,
@@ -221,7 +228,8 @@ def train_classifier(net, model_dir, train_config=None):
                     writer.add_figure('test/confusion_matrix', fig, total_iters)
                     loss = sum(loss_hist) / len(loss_hist)
                     writer.add_scalars('cross_entropy_loss', {'Test set loss': loss}, total_iters)
-                    plt_roc_curve(labels_total_one_hot, outputs_preds, np.array(['N', 'S', 'V', 'F', 'Q']), writer, total_iters)
+                    plt_roc_curve(labels_total_one_hot, outputs_preds, np.array(['N', 'S', 'V', 'F', 'Q']), writer,
+                                  total_iters)
                     # plt_roc_curve(labels_total_one_hot, outputs_preds, np.array(['N', 'Others']), writer,
                     #               total_iters)
     writer.close()
@@ -238,6 +246,10 @@ def get_gradient_norm_l2(model):
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    net = lstm.ECGLSTM(5, 512, 5, 2)
-    train_config = ECGTrainConfig(num_epochs=4, batch_size=10, lr=0.002, weighted_loss=False, weighted_sampling=True)
-    train_classifier(net, model_dir='tensorboard/lstm_weighted_sampling', train_config=train_config)
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    logging.info("Device: {}".format(device))
+
+    net = lstm.ECGLSTM(5, 512, 5, 2).to(device)
+    train_config = ECGTrainConfig(num_epochs=4, batch_size=16, lr=0.002, weighted_loss=False, weighted_sampling=True,
+                                  device=device)
+    train_classifier(net, model_dir='tensorboard/lstm_adam_weighted', train_config=train_config)
