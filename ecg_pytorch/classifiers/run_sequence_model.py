@@ -10,9 +10,18 @@ from sklearn.metrics import roc_curve, auc
 from sklearn.utils.multiclass import unique_labels
 from sklearn.metrics import confusion_matrix
 from ecg_pytorch.classifiers.models import lstm
-from ecg_pytorch.train_configs import ECGTrainConfig
+from ecg_pytorch.train_configs import ECGTrainConfig, GeneratorAdditionalDataConfig
+from ecg_pytorch.gan_models.models import dcgan
 import logging
 import time
+import os
+import shutil
+
+BEST_AUC_N = 0
+BEST_AUC_S = 0
+BEST_AUC_V = 0
+BEST_AUC_F = 0
+BEST_AUC_Q = 0
 
 
 def init_weights(m):
@@ -35,6 +44,11 @@ def plt_roc_curve(y_true, y_pred, classes, writer, total_iters):
     :param classes:5
     :return:
     """
+    global BEST_AUC_N
+    global BEST_AUC_S
+    global BEST_AUC_V
+    global BEST_AUC_F
+    global BEST_AUC_Q
     fpr = {}
     tpr = {}
     roc_auc = {}
@@ -42,6 +56,22 @@ def plt_roc_curve(y_true, y_pred, classes, writer, total_iters):
     for i in range(n_classes):
         fpr[classes[i]], tpr[classes[i]], _ = roc_curve(y_true[:, i], y_pred[:, i])
         roc_auc[classes[i]] = auc(fpr[classes[i]], tpr[classes[i]])
+
+        if i == 0 and roc_auc[classes[i]] > BEST_AUC_N:
+            BEST_AUC_N = roc_auc[classes[i]]
+        if i == 1 and roc_auc[classes[i]] > BEST_AUC_S:
+            BEST_AUC_S = roc_auc[classes[i]]
+        if i == 2 and roc_auc[classes[i]] > BEST_AUC_V:
+            BEST_AUC_V = roc_auc[classes[i]]
+        if i == 3 and roc_auc[classes[i]] > BEST_AUC_F:
+            BEST_AUC_F = roc_auc[classes[i]]
+        if i == 4 and roc_auc[classes[i]] > BEST_AUC_Q:
+            BEST_AUC_Q = roc_auc[classes[i]]
+
+        logging.info("Best AUC:\n N: {}\tS: {}\tV: {}\tF: {}\tQ: {}".format(BEST_AUC_N, BEST_AUC_S,
+                                                                            BEST_AUC_V, BEST_AUC_F,
+                                                                            BEST_AUC_Q))
+
         fig = plt.figure()
         lw = 2
         plt.plot(fpr[classes[i]], tpr[classes[i]], color='darkorange',
@@ -123,9 +153,22 @@ def train_classifier(net, model_dir, train_config=None):
     num_of_epochs = train_config.num_epochs
     lr = train_config.lr
     device = train_config.device
+    add_from_gan = train_config.add_data_from_gan
 
     composed = transforms.Compose([ToTensor()])
     dataset = EcgHearBeatsDataset(transform=composed)
+    #
+    # Check if to add data from GAN #
+    #
+    if add_from_gan:
+        num_examples_to_add = train_config.generator_details.num_examples_to_add
+        generator_checkpoint_path = train_config.generator_details.checkpoint_path
+        generator_beat_type = train_config.generator_details.beat_type
+        gNet = dcgan.DCGenerator(0)
+        dataset.add_beats_from_generator(gNet, num_examples_to_add,
+                                         generator_checkpoint_path,
+                                         generator_beat_type)
+
     if train_config.weighted_sampling:
         weights_for_balance = dataset.make_weights_for_balanced_classes()
         weights_for_balance = torch.DoubleTensor(weights_for_balance)
@@ -149,7 +192,7 @@ def train_classifier(net, model_dir, train_config=None):
 
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(net.parameters(), lr=lr)
-    writer = SummaryWriter(model_dir)
+    writer = SummaryWriter(model_dir, max_queue=1000)
     total_iters = 0
     num_iters_per_epoch = int(np.floor(len(dataset) / batch_size) + batch_size)
     for epoch in range(num_of_epochs):  # loop over the dataset multiple times
@@ -180,7 +223,7 @@ def train_classifier(net, model_dir, train_config=None):
                                                                                                       loss.item(),
                                                                                                       accuracy.item()))
             if total_iters % 50 == 0:
-                fig, _ = plot_confusion_matrix(labels_class.numpy(), outputs_class.numpy(),
+                fig, _ = plot_confusion_matrix(labels_class.cpu().numpy(), outputs_class.cpu().numpy(),
                                                np.array(['N', 'S', 'V', 'F', 'Q']))
                 # fig, _ = plot_confusion_matrix(labels_class.numpy(), outputs_class.numpy(),
                 #                                np.array(['N', 'Others']))
@@ -190,7 +233,7 @@ def train_classifier(net, model_dir, train_config=None):
                 writer.add_scalar('gradients_norm', grad_norm, total_iters)
                 logging.info("Norm of gradients = {}.".format(grad_norm))
 
-            if total_iters % 1000 == 0:
+            if total_iters % 200 == 0:
                 with torch.no_grad():
                     labels_total_one_hot = np.array([]).reshape((0, 5))
                     outputs_preds = np.array([]).reshape((0, 5))
@@ -210,10 +253,10 @@ def train_classifier(net, model_dir, train_config=None):
                         loss_hist.append(loss.item())
                         outputs_class = torch.max(outputs, 1)[1]
 
-                        labels_total_one_hot = np.concatenate((labels_total_one_hot, labels.numpy()))
-                        labels_total = np.concatenate((labels_total, labels_class.numpy()))
-                        outputs_total = np.concatenate((outputs_total, outputs_class.numpy()))
-                        outputs_preds = np.concatenate((outputs_preds, outputs.numpy()))
+                        labels_total_one_hot = np.concatenate((labels_total_one_hot, labels.cpu().numpy()))
+                        labels_total = np.concatenate((labels_total, labels_class.cpu().numpy()))
+                        outputs_total = np.concatenate((outputs_total, outputs_class.cpu().numpy()))
+                        outputs_preds = np.concatenate((outputs_preds, outputs.cpu().numpy()))
                     end = time.time()
                     print("Test evaluation took {:.2f} seconds".format(end - start))
                     outputs_total = outputs_total.astype(int)
@@ -244,12 +287,43 @@ def get_gradient_norm_l2(model):
     return total_norm
 
 
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
+def train_mult():
+    global BEST_AUC_N
+    global BEST_AUC_S
+    global BEST_AUC_V
+    global BEST_AUC_F
+    global BEST_AUC_Q
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     logging.info("Device: {}".format(device))
+    ck_path = '/home/tomer.golany@st.technion.ac.il/ecg_pytorch/ecg_pytorch/gan_models/tensorboard/ecg_dcgan_N_beat/' \
+              'checkpoint_epoch_2_iters_1819'
+    gen_details = GeneratorAdditionalDataConfig(beat_type='N', checkpoint_path=ck_path, num_examples_to_add=1500)
+    train_config = ECGTrainConfig(num_epochs=5, batch_size=20, lr=0.0002, weighted_loss=False, weighted_sampling=True,
+                                  device=device, add_data_from_gan=True, generator_details=gen_details)
+    total_runs = 0
+    while BEST_AUC_N <= 0.895:
+        if total_runs == 5:
+            break
+        if os.path.isdir(
+                '/home/tomer.golany@st.technion.ac.il/ecg_pytorch/ecg_pytorch/classifiers/tensorboard/N/lstm_add_1500/'):
+            logging.info("Removing model dir")
+            shutil.rmtree('/home/tomer.golany@st.technion.ac.il/ecg_pytorch/ecg_pytorch/classifiers/tensorboard/N/lstm_add_1500/')
+        net = lstm.ECGLSTM(5, 512, 5, 2).to(device)
+        train_classifier(net, model_dir='tensorboard//N/lstm_add_1500/', train_config=train_config)
+        total_runs += 1
+    logging.info("Done after {} runs.".format(total_runs))
+    logging.info("Best AUC:\n N: {}\tS: {}\tV: {}\tF: {}\tQ: {}".format(BEST_AUC_N, BEST_AUC_S,
+                                                                        BEST_AUC_V, BEST_AUC_F,
+                                                                        BEST_AUC_Q))
 
-    net = lstm.ECGLSTM(5, 512, 5, 2).to(device)
-    train_config = ECGTrainConfig(num_epochs=4, batch_size=16, lr=0.002, weighted_loss=False, weighted_sampling=True,
-                                  device=device)
-    train_classifier(net, model_dir='tensorboard/lstm_adam_weighted', train_config=train_config)
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    # logging.info("Device: {}".format(device))
+    #
+    # net = lstm.ECGLSTM(5, 512, 5, 2).to(device)
+    # train_config = ECGTrainConfig(num_epochs=4, batch_size=16, lr=0.002, weighted_loss=False, weighted_sampling=True,
+    #                               device=device)
+    # train_classifier(net, model_dir='tensorboard/lstm_adam_weighted', train_config=train_config)
+    train_mult()

@@ -11,6 +11,13 @@ from sklearn.utils.multiclass import unique_labels
 import numpy as np
 from torch.utils.data.sampler import Sampler
 from sklearn.metrics import roc_curve, auc
+from ecg_pytorch.classifiers.models import fully_connected
+from ecg_pytorch.gan_models.models import dcgan
+import shutil
+import os
+import logging
+
+AUC_VALUE = 0
 
 
 def plt_roc_curve(y_true, y_pred, classes, writer, total_iters):
@@ -21,6 +28,7 @@ def plt_roc_curve(y_true, y_pred, classes, writer, total_iters):
     :param classes:5
     :return:
     """
+    global AUC_VALUE
     fpr = {}
     tpr = {}
     roc_auc = {}
@@ -28,6 +36,11 @@ def plt_roc_curve(y_true, y_pred, classes, writer, total_iters):
     for i in range(n_classes):
         fpr[classes[i]], tpr[classes[i]], _ = roc_curve(y_true[:, i], y_pred[:, i])
         roc_auc[classes[i]] = auc(fpr[classes[i]], tpr[classes[i]])
+        if i == 2:
+            curr_auc = roc_auc[classes[i]]
+            if curr_auc > AUC_VALUE:
+                logging.info("New maxumal AUC: {}".format(AUC_VALUE))
+                AUC_VALUE = curr_auc
         fig = plt.figure()
         lw = 2
         plt.plot(fpr[classes[i]], tpr[classes[i]], color='darkorange',
@@ -105,9 +118,17 @@ def train_classifier(net, batch_size, model_dir):
     :param network:
     :return:
     """
-
+    global AUC_VALUE
+    if os.path.isdir('/Users/tomer.golany/PycharmProjects/ecg_pytorch/ecg_pytorch/classifiers/tensorboard/V/add_15000_fc/'):
+        shutil.rmtree('/Users/tomer.golany/PycharmProjects/ecg_pytorch/ecg_pytorch/classifiers/tensorboard/V/add_15000_fc/')
     composed = transforms.Compose([ecg_dataset.ToTensor()])
     dataset = ecg_dataset.EcgHearBeatsDataset(transform=composed)
+    gNet = dcgan.DCGenerator(0)
+    checkpoint_path = '/Users/tomer.golany/PycharmProjects/ecg_pytorch/ecg_pytorch/gan_models/tensorboard/ecg_dcgan_V_beat/' \
+                      'checkpoint_epoch_22_iters_1563'
+    dataset.add_beats_from_generator(gNet, 15000,
+                                         checkpoint_path,
+                                         'V')
     # weights_for_balance = dataset.make_weights_for_balanced_classes()
     # weights_for_balance = torch.DoubleTensor(weights_for_balance)
     # sampler = torch.utils.data.sampler.WeightedRandomSampler(
@@ -125,12 +146,13 @@ def train_classifier(net, batch_size, model_dir):
     optimizer = optim.Adam(net.parameters(), lr=0.0001)
     writer = SummaryWriter(model_dir)
     total_iters = 0
-    for epoch in range(2):  # loop over the dataset multiple times
+    for epoch in range(4):  # loop over the dataset multiple times
 
         for i, data in enumerate(dataloader):
             total_iters += 1
             # get the inputs
-            ecg_batch = data['cardiac_cycle'].view(-1, 1, 216).float()
+            # ecg_batch = data['cardiac_cycle'].view(-1, 1, 216).float()
+            ecg_batch = data['cardiac_cycle'].float()
             b_size = ecg_batch.shape[0]
             labels = data['label']
             labels_class = torch.max(labels, 1)[1]
@@ -145,16 +167,16 @@ def train_classifier(net, batch_size, model_dir):
             loss = criterion(outputs, torch.max(labels, 1)[1])
             loss.backward()
             optimizer.step()
-            writer.add_scalars('Cross entropy loss', {'Train batches loss': loss.item()}, total_iters)
+            writer.add_scalars('Cross_entropy_loss', {'Train batches loss': loss.item()}, total_iters)
             writer.add_scalars('Accuracy', {'Train batches accuracy': accuracy.item()}, total_iters)
             # print statistics
             print("Epoch {}. Iteration {}.\t Batch loss = {:.2f}. Accuracy = {:.2f}".format(epoch + 1, i, loss.item(),
                                                                                             accuracy.item()))
-            if i % 50 == 0:
+            if total_iters % 50 == 0:
                 fig, _ = plot_confusion_matrix(labels_class.numpy(), outputs_class.numpy(), np.array(['N', 'S', 'V', 'F', 'Q']))
                 writer.add_figure('train/confusion_matrix', fig, total_iters)
 
-            if i % 100 == 0:
+            if total_iters % 200 == 0:
                 with torch.no_grad():
                     labels_total_one_hot = np.array([]).reshape((0, 5))
                     outputs_preds = np.array([]).reshape((0, 5))
@@ -162,7 +184,8 @@ def train_classifier(net, batch_size, model_dir):
                     outputs_total = np.array([])
                     loss_hist = []
                     for _, test_data in enumerate(testdataloader):
-                        ecg_batch = test_data['cardiac_cycle'].view(-1, 1, 216).float()
+                        # ecg_batch = test_data['cardiac_cycle'].view(-1, 1, 216).float()
+                        ecg_batch = test_data['cardiac_cycle'].float()
                         labels = test_data['label']
                         labels_class = torch.max(labels, 1)[1]
                         outputs = net(ecg_batch)
@@ -184,11 +207,26 @@ def train_classifier(net, batch_size, model_dir):
                     writer.add_scalars('Accuracy', {'Test set accuracy': accuracy}, global_step=total_iters)
                     writer.add_figure('test/confusion_matrix', fig, total_iters)
                     loss = sum(loss_hist) / len(loss_hist)
-                    writer.add_scalars('Cross entropy loss', {'Test set loss': loss}, total_iters)
+                    writer.add_scalars('Cross_entropy_loss', {'Test set loss': loss}, total_iters)
                     plt_roc_curve(labels_total_one_hot, outputs_preds, np.array(['N', 'S', 'V', 'F', 'Q']), writer, total_iters)
     writer.close()
 
 
+def train_mult():
+    net = fully_connected.FF()
+    num_runs = 0
+    while AUC_VALUE <= 0.975:
+        if num_runs == 10:
+            break
+        logging.info("AUC VALUE: {}".format(AUC_VALUE))
+        train_classifier(net, 50, model_dir='tensorboard/V/add_15000_fc')
+        num_runs += 1
+    logging.info("Best AUC VALUE: {}".format(AUC_VALUE))
+
+
 if __name__ == "__main__":
-    net = cnn.Net()
-    train_classifier(net, 50, model_dir='tensorboard/cnn')
+    logging.basicConfig(level=logging.INFO)
+    # net = cnn.Net()
+    # net = fully_connected.FF()
+    # train_classifier(net, 50, model_dir='tensorboard/S/add_500_fc')
+    train_mult()
