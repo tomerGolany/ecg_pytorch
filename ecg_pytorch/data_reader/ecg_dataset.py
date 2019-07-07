@@ -5,6 +5,7 @@ import torch
 from torchvision import transforms
 from ecg_pytorch.data_reader import pickle_data
 from ecg_pytorch.gan_models.models import dcgan
+import random
 
 
 class EcgHearBeatsDataset(Dataset):
@@ -31,6 +32,7 @@ class EcgHearBeatsDataset(Dataset):
                                            'V': [0, 0, 1, 0, 0],
                                            'F': [0, 0, 0, 1, 0],
                                            'Q': [0, 0, 0, 0, 1]}
+        self.additional_data_from_gan = None
 
     def __len__(self):
         return len(self.train)
@@ -62,8 +64,24 @@ class EcgHearBeatsDataset(Dataset):
             output_g = np.array(
                 [{'cardiac_cycle': x, 'beat_type': beat_type, 'label': self.beat_type_to_one_hot_label[beat_type]} for x
                  in output_g])
+            # plt.plot(output_g[0]['cardiac_cycle'])
+            # plt.show()
+            self.additional_data_from_gan = output_g
             self.train = np.concatenate((self.train, output_g))
             print("Length of train samples after adding from generator is {}".format(len(self.train)))
+
+    def vizualize_data_from_gan_and_real(self, beat_type):
+        specific_beat = np.array([sample for sample in self.train if sample['beat_type'] == beat_type])
+        # Show 4 beats:
+        for _ in range(4):
+            plt.figure()
+            ind = random.randint(0, len(self.additional_data_from_gan))
+            fake_beat = self.additional_data_from_gan[ind]
+            plt.plot(fake_beat['cardiac_cycle'], label='Fake')
+            ind = random.randint(0, len(specific_beat))
+            plt.plot(specific_beat[ind]['cardiac_cycle'], label='Real')
+            plt.title("Compare beats of type {}".format(beat_type))
+            plt.legend()
 
     def __getitem__(self, idx):
         sample = self.train[idx]
@@ -231,7 +249,7 @@ if __name__ == "__main__":
     ecg_dataset = EcgHearBeatsDataset()
     gNet = dcgan.DCGenerator(0)
     checkpoint_path = '/Users/tomer.golany/PycharmProjects/ecg_pytorch/ecg_pytorch/gan_models/tensorboard/ecg_dcgan_N_beat/' \
-                      'checkpoint_epoch_0_iters_201'
-    ecg_dataset.add_beats_from_generator(gNet, 1,
+                      'checkpoint_epoch_0_iters_801'
+    ecg_dataset.add_beats_from_generator(gNet, 500,
                                          checkpoint_path,
                                          'N')
