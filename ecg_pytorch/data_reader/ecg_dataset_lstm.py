@@ -80,6 +80,23 @@ class EcgHearBeatsDataset(Dataset):
             sample = self.transform(sample)
         return sample
 
+    def add_beats_from_generator(self, generator_model, num_beats_to_add, checkpoint_path, beat_type):
+        checkpoint = torch.load(checkpoint_path)
+        generator_model.load_state_dict(checkpoint['generator_state_dict'])
+        # discriminator_model.load_state_dict(checkpoint['discriminator_state_dict'])
+        with torch.no_grad():
+            input_noise = torch.Tensor(np.random.normal(0, 1, (num_beats_to_add, 100)))
+            output_g = generator_model(input_noise)
+            output_g = output_g.numpy()
+            output_g = np.array(
+                [{'cardiac_cycle': x, 'beat_type': beat_type, 'label': self.beat_type_to_one_hot_label[beat_type]} for x
+                 in output_g])
+            # plt.plot(output_g[0]['cardiac_cycle'])
+            # plt.show()
+            self.additional_data_from_gan = output_g
+            self.train = np.concatenate((self.train, output_g))
+            print("Length of train samples after adding from generator is {}".format(len(self.train)))
+
 
 class EcgHearBeatsDatasetTest(Dataset):
     """ECG heart beats dataset."""
