@@ -29,7 +29,7 @@ def rrprocess(n, f1=0.1, f2=0.25, c1=0.01, c2=0.01, lfhfratio=0.5, hrmean=60, hr
     #f = np.linspace(0, 2.0 * math.pi, 512)
     f = np.linspace(0, 0.5, n)
     # Calaculate Power Spectrum S(f)
-    S_F = sig1 * norm.pdf(x=f, loc=f1, scale=c1) + sig2 * norm.pdf(x=f, loc=f2, scale=c2)
+    # S_F = sig1 * norm.pdf(x=f, loc=f1, scale=c1) + sig2 * norm.pdf(x=f, loc=f2, scale=c2)
     # x_axis = np.linspace(0, 2.0, n)
     # plt.figure()
     # plt.plot(x_axis, S_F)

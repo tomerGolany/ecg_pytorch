@@ -2,7 +2,21 @@
 <project version="4">
   <component name="PublishConfigData">
     <serverData>
+      <paths name="niv1">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/tomer/ecg_pytorch" local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
       <paths name="nlp8">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/ecg_pytorch" local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="nlp9">
         <serverdata>
           <mappings>
             <mapping deploy="/ecg_pytorch" local="$PROJECT_DIR$" web="/" />

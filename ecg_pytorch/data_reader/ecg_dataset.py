@@ -6,6 +6,7 @@ from torchvision import transforms
 from ecg_pytorch.data_reader import pickle_data
 from ecg_pytorch.gan_models.models import dcgan
 import random
+from ecg_pytorch.gan_models.models.old_ode_combined import CombinedGenerator as CG
 
 
 class EcgHearBeatsDataset(Dataset):
@@ -54,7 +55,7 @@ class EcgHearBeatsDataset(Dataset):
         return weight
 
     def add_beats_from_generator(self, generator_model, num_beats_to_add, checkpoint_path, beat_type):
-        checkpoint = torch.load(checkpoint_path)
+        checkpoint = torch.load(checkpoint_path, map_location='cpu')
         generator_model.load_state_dict(checkpoint['generator_state_dict'])
         # discriminator_model.load_state_dict(checkpoint['discriminator_state_dict'])
         with torch.no_grad():
@@ -69,6 +70,28 @@ class EcgHearBeatsDataset(Dataset):
             self.additional_data_from_gan = output_g
             self.train = np.concatenate((self.train, output_g))
             print("Length of train samples after adding from generator is {}".format(len(self.train)))
+
+    def add_beats_from_combined_generator(self, generator_model, num_beats_to_add, checkpoint_path, beat_type):
+        checkpoint = torch.load(checkpoint_path, map_location='cpu')
+        generator_model.load_state_dict(checkpoint['generator_state_dict'])
+        # discriminator_model.load_state_dict(checkpoint['discriminator_state_dict'])
+        with torch.no_grad():
+            input_noise = torch.Tensor(np.random.normal(0, 1, (num_beats_to_add, 50)))
+            inds = np.random.choice(len(self.train), 500, replace=False)
+            input_v0 = self.train[inds]
+
+            input_v0 = torch.Tensor([v['cardiac_cycle'][0] for v in input_v0])
+            output_g = generator_model(input_noise, input_v0)
+            output_g = output_g.numpy()
+            output_g = np.array(
+                [{'cardiac_cycle': x, 'beat_type': beat_type, 'label': self.beat_type_to_one_hot_label[beat_type]} for x
+                 in output_g])
+            plt.plot(output_g[0]['cardiac_cycle'])
+            plt.show()
+            self.additional_data_from_gan = output_g
+            self.train = np.concatenate((self.train, output_g))
+            print("Length of train samples after adding from generator is {}".format(len(self.train)))
+
 
     def vizualize_data_from_gan_and_real(self, beat_type):
         specific_beat = np.array([sample for sample in self.train if sample['beat_type'] == beat_type])
@@ -91,6 +114,24 @@ class EcgHearBeatsDataset(Dataset):
         if self.transform:
             sample = self.transform(sample)
         return sample
+
+
+def scale_signal(signal, min_val=-0.01563, max_val=0.042557):
+    """
+
+    :param min:
+    :param max:
+    :return:
+    """
+    # Scale signal to lie between -0.4 and 1.2 mV :
+    scaled = np.interp(signal, (signal.min(), signal.max()), (min_val, max_val))
+
+    # zmin = min(signal)
+    # zmax = max(signal)
+    # zrange = zmax - zmin
+    # # for (i=1; i <= Nts; i++)
+    # scaled = [(z - zmin) * max_val / zrange + min_val for z in signal]
+    return scaled
 
 
 class EcgHearBeatsDatasetTest(Dataset):
@@ -144,6 +185,15 @@ class ToTensor(object):
         heartbeat, label = sample['cardiac_cycle'], sample['label']
         return {'cardiac_cycle': (torch.from_numpy(heartbeat)).double(),
                 'label': torch.from_numpy(label),
+                'beat_type': sample['beat_type']}
+
+
+class Scale(object):
+    def __call__(self, sample):
+        heartbeat, label = sample['cardiac_cycle'], sample['label']
+        heartbeat = scale_signal(heartbeat)
+        return {'cardiac_cycle': heartbeat,
+                'label': label,
                 'beat_type': sample['beat_type']}
 
 
@@ -246,10 +296,20 @@ if __name__ == "__main__":
     # ecg_dataset = EcgHearBeatsDataset()
     # ecg_dataset.make_weights_for_balanced_classes()
     # test_balanced_iterations()
-    ecg_dataset = EcgHearBeatsDataset()
-    gNet = dcgan.DCGenerator(0)
-    checkpoint_path = '/Users/tomer.golany/PycharmProjects/ecg_pytorch/ecg_pytorch/gan_models/tensorboard/ecg_dcgan_N_beat/' \
-                      'checkpoint_epoch_0_iters_801'
-    ecg_dataset.add_beats_from_generator(gNet, 500,
-                                         checkpoint_path,
-                                         'N')
+    ecg_dataset = EcgHearBeatsDataset(beat_type='N')
+    # gNet = dcgan.DCGenerator(0)
+    # checkpoint_path = '/Users/tomer.golany/PycharmProjects/ecg_pytorch/ecg_pytorch/gan_models/tensorboard/ecg_dcgan_N_beat/' \
+    #                   'checkpoint_epoch_0_iters_801'
+    # ecg_dataset.add_beats_from_generator(gNet, 500,
+    #                                      checkpoint_path,
+    #                                      'N')
+
+    # gNet = CG(0, 'cpu')
+    # ch_path = '/Users/tomer.golany/PycharmProjects/py_torch_runge_kutta/gan_models/tensorboard/combined_generator_N/checkpoint_epoch_0_iters_200'
+    # ecg_dataset.add_beats_from_combined_generator(gNet, 500, ch_path, 'N')
+
+    beats = ecg_dataset.train
+    max_value = max([max(b['cardiac_cycle']) for b in beats])
+    min_value = min([min(b['cardiac_cycle']) for b in beats])
+    print(max_value)
+    print(min_value)

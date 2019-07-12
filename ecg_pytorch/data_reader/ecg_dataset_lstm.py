@@ -97,6 +97,14 @@ class EcgHearBeatsDataset(Dataset):
             self.train = np.concatenate((self.train, output_g))
             print("Length of train samples after adding from generator is {}".format(len(self.train)))
 
+    def add_noise(self, n, beat_type):
+        input_noise = np.random.normal(0, 1, (n, 216))
+
+        input_noise = np.array(
+            [{'cardiac_cycle': x, 'beat_type': beat_type, 'label': self.beat_type_to_one_hot_label[beat_type]} for x
+             in input_noise])
+        self.train = np.concatenate((self.train, input_noise))
+
 
 class EcgHearBeatsDatasetTest(Dataset):
     """ECG heart beats dataset."""

@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch.nn as nn
 from ecg_pytorch.dynamical_model.ode_params import ODEParams
-from ecg_pytorch.data_reader import ecg_dataset
+# from ecg_pytorch.data_reader import ecg_dataset
 import torchvision.transforms as transforms
 
 
@@ -69,6 +69,7 @@ def euler(params_batch, device_name, v0):
     # z = torch.tensor(-0.004551233843726818).to(device_name)
 
     res = []
+    print(len(params_batch))
     for j, params in enumerate(params_batch):
         z = torch.tensor(v0[j]).to(device_name)
         t = torch.tensor(0.0).to(device_name)
@@ -91,41 +92,41 @@ def euler(params_batch, device_name, v0):
     return res
 
 
-def test_euler_with_different_inits():
-    composed = transforms.Compose([ecg_dataset.Scale(), ecg_dataset.ToTensor()])
-    dataset = ecg_dataset.EcgHearBeatsDataset(transform=composed, beat_type='N')
-    dataloader = torch.utils.data.DataLoader(dataset, batch_size=2,
-                                             shuffle=False, num_workers=1)
-    for i, e in enumerate(dataloader):
-        # e = dataset[i]
-        if i == 5:
-            break
-        v0 = e['cardiac_cycle'].numpy()[:, 0]
-        print("v0 = {}".format(v0))
-        input = np.array((
-            ([1.2, 0.25, -60.0 * math.pi / 180.0, -5.0, 0.1, -15.0 * math.pi / 180.0,
-              30.0, 0.1, 0.0 * math.pi / 180.0, -7.5, 0.1, 15.0 * math.pi / 180.0, 0.75, 0.4,
-              90.0 * math.pi / 180.0]))).reshape((1, 15))
-
-        a1 = torch.nn.Parameter(torch.Tensor(input), requires_grad=True)
-        a2 = torch.nn.Parameter(torch.Tensor(input), requires_grad=True)
-        third_tensor = torch.cat((a1, a2), 0)
-        res = euler(third_tensor, "cpu", v0)
-        print(res.shape)
-        res0 = res.detach().numpy()[0]
-        plt.figure()
-        plt.plot(res0, label='ode beat')
-        plt.plot(e['cardiac_cycle'][0].numpy(), label="real")
-        plt.legend()
-        plt.show()
-
-        res1 = res.detach().numpy()[1]
-        plt.figure()
-        plt.plot(res1, label='ode beat')
-        plt.plot(e['cardiac_cycle'][1].numpy(), label="real")
-        plt.legend()
-        plt.title("verf")
-        plt.show()
+# def test_euler_with_different_inits():
+#     composed = transforms.Compose([ecg_dataset.Scale(), ecg_dataset.ToTensor()])
+#     dataset = ecg_dataset.EcgHearBeatsDataset(transform=composed, beat_type='N')
+#     dataloader = torch.utils.data.DataLoader(dataset, batch_size=2,
+#                                              shuffle=False, num_workers=1)
+#     for i, e in enumerate(dataloader):
+#         # e = dataset[i]
+#         if i == 5:
+#             break
+#         v0 = e['cardiac_cycle'].numpy()[:, 0]
+#         print("v0 = {}".format(v0))
+#         input = np.array((
+#             ([1.2, 0.25, -60.0 * math.pi / 180.0, -5.0, 0.1, -15.0 * math.pi / 180.0,
+#               30.0, 0.1, 0.0 * math.pi / 180.0, -7.5, 0.1, 15.0 * math.pi / 180.0, 0.75, 0.4,
+#               90.0 * math.pi / 180.0]))).reshape((1, 15))
+#
+#         a1 = torch.nn.Parameter(torch.Tensor(input), requires_grad=True)
+#         a2 = torch.nn.Parameter(torch.Tensor(input), requires_grad=True)
+#         third_tensor = torch.cat((a1, a2), 0)
+#         res = euler(third_tensor, "cpu", v0)
+#         print(res.shape)
+#         res0 = res.detach().numpy()[0]
+#         plt.figure()
+#         plt.plot(res0, label='ode beat')
+#         plt.plot(e['cardiac_cycle'][0].numpy(), label="real")
+#         plt.legend()
+#         plt.show()
+#
+#         res1 = res.detach().numpy()[1]
+#         plt.figure()
+#         plt.plot(res1, label='ode beat')
+#         plt.plot(e['cardiac_cycle'][1].numpy(), label="real")
+#         plt.legend()
+#         plt.title("verf")
+#         plt.show()
 
 
 if __name__ == "__main__":
@@ -156,4 +157,5 @@ if __name__ == "__main__":
     # res = [x.detach().numpy() for x in res[1]]
     # plt.plot(res)
     # plt.show()
-    test_euler_with_different_inits()
+    # test_euler_with_different_inits()
+    pass

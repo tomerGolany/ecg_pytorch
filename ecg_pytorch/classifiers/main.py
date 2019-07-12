@@ -13,9 +13,12 @@ from torch.utils.data.sampler import Sampler
 from sklearn.metrics import roc_curve, auc
 from ecg_pytorch.classifiers.models import fully_connected
 from ecg_pytorch.gan_models.models import dcgan
+from ecg_pytorch.gan_models.models import ode_gan_aaai
 import shutil
 import os
 import logging
+from ecg_pytorch.gan_models.models.old_ode_combined import CombinedGenerator as CG
+from ecg_pytorch.gan_models import checkpoint_paths
 
 AUC_VALUE = 0
 
@@ -36,7 +39,7 @@ def plt_roc_curve(y_true, y_pred, classes, writer, total_iters):
     for i in range(n_classes):
         fpr[classes[i]], tpr[classes[i]], _ = roc_curve(y_true[:, i], y_pred[:, i])
         roc_auc[classes[i]] = auc(fpr[classes[i]], tpr[classes[i]])
-        if i == 2:
+        if i == 0:
             curr_auc = roc_auc[classes[i]]
             if curr_auc > AUC_VALUE:
                 logging.info("New maxumal AUC: {}".format(AUC_VALUE))
@@ -112,23 +115,29 @@ def plot_confusion_matrix(y_true, y_pred, classes,
     return fig, ax
 
 
-def train_classifier(net, batch_size, model_dir):
+def train_classifier(net, batch_size, model_dir, n=0, ch_path=None, beat_type=None):
     """
 
     :param network:
     :return:
     """
     global AUC_VALUE
-    if os.path.isdir('/Users/tomer.golany/PycharmProjects/ecg_pytorch/ecg_pytorch/classifiers/tensorboard/V/add_15000_fc/'):
-        shutil.rmtree('/Users/tomer.golany/PycharmProjects/ecg_pytorch/ecg_pytorch/classifiers/tensorboard/V/add_15000_fc/')
+    if os.path.isdir(model_dir):
+        shutil.rmtree(model_dir)
     composed = transforms.Compose([ecg_dataset.ToTensor()])
     dataset = ecg_dataset.EcgHearBeatsDataset(transform=composed)
-    gNet = dcgan.DCGenerator(0)
-    checkpoint_path = '/Users/tomer.golany/PycharmProjects/ecg_pytorch/ecg_pytorch/gan_models/tensorboard/ecg_dcgan_V_beat/' \
-                      'checkpoint_epoch_22_iters_1563'
-    dataset.add_beats_from_generator(gNet, 15000,
-                                         checkpoint_path,
-                                         'V')
+    # gNet = CG(0, 'cpu')
+    if n != 0:
+        gNet = ode_gan_aaai.DCGenerator(0)
+
+        dataset.add_beats_from_generator(gNet, n, ch_path, beat_type)
+    # gNet = dcgan.DCGenerator(0)
+    # checkpoint_path = '/Users/tomer.golany/PycharmProjects/ecg_pytorch/ecg_pytorch/gan_models/tensorboard/ecg_dcgan_V_beat/' \
+    #                   'checkpoint_epoch_22_iters_1563'
+
+    # dataset.add_beats_from_generator(gNet, 15000,
+    #                                      checkpoint_path,
+    #                                      'V')
     # weights_for_balance = dataset.make_weights_for_balanced_classes()
     # weights_for_balance = torch.DoubleTensor(weights_for_balance)
     # sampler = torch.utils.data.sampler.WeightedRandomSampler(
@@ -151,8 +160,8 @@ def train_classifier(net, batch_size, model_dir):
         for i, data in enumerate(dataloader):
             total_iters += 1
             # get the inputs
-            # ecg_batch = data['cardiac_cycle'].view(-1, 1, 216).float()
-            ecg_batch = data['cardiac_cycle'].float()
+            ecg_batch = data['cardiac_cycle'].view(-1, 1, 216).float()
+            # ecg_batch = data['cardiac_cycle'].float()
             b_size = ecg_batch.shape[0]
             labels = data['label']
             labels_class = torch.max(labels, 1)[1]
@@ -184,8 +193,8 @@ def train_classifier(net, batch_size, model_dir):
                     outputs_total = np.array([])
                     loss_hist = []
                     for _, test_data in enumerate(testdataloader):
-                        # ecg_batch = test_data['cardiac_cycle'].view(-1, 1, 216).float()
-                        ecg_batch = test_data['cardiac_cycle'].float()
+                        ecg_batch = test_data['cardiac_cycle'].view(-1, 1, 216).float()
+                        # ecg_batch = test_data['cardiac_cycle'].float()
                         labels = test_data['label']
                         labels_class = torch.max(labels, 1)[1]
                         outputs = net(ecg_batch)
@@ -209,24 +218,36 @@ def train_classifier(net, batch_size, model_dir):
                     loss = sum(loss_hist) / len(loss_hist)
                     writer.add_scalars('Cross_entropy_loss', {'Test set loss': loss}, total_iters)
                     plt_roc_curve(labels_total_one_hot, outputs_preds, np.array(['N', 'S', 'V', 'F', 'Q']), writer, total_iters)
+
+    torch.save({
+        'net': net.state_dict()
+    }, model_dir + '/checkpoint_epoch_iters_{}'.format(total_iters))
     writer.close()
 
 
 def train_mult():
-    net = fully_connected.FF()
-    num_runs = 0
-    while AUC_VALUE <= 0.975:
-        if num_runs == 10:
-            break
-        logging.info("AUC VALUE: {}".format(AUC_VALUE))
-        train_classifier(net, 50, model_dir='tensorboard/V/add_15000_fc')
-        num_runs += 1
-    logging.info("Best AUC VALUE: {}".format(AUC_VALUE))
+    # model_dir = 'tensorboard/N/add_{}_fc_ode_gan/'
+    ch_ppath = checkpoint_paths.ODE_GAN_N_CHK
+    beat_type = 'N'
+
+    with open('N_fc_ode_res.txt', 'w') as fd:
+        for n in [500, 800, 1000, 1500, 3000, 5000, 7000, 10000, 15000]:
+            num_runs = 0
+            AUC_VALUE = 0
+            while num_runs < 10:
+                net = fully_connected.FF()
+                logging.info("AUC VALUE: {}".format(AUC_VALUE))
+                model_dir = 'tensorboard/N/add_{}_fc_ode_gan/'.format(str(n))
+                train_classifier(net, 50, model_dir=model_dir, n=n, ch_path=ch_ppath, beat_type=beat_type)
+                num_runs += 1
+            logging.info("Best AUC VALUE: {}".format(AUC_VALUE))
+            w = "{} : {}".format(str(n), str(AUC_VALUE))
+            fd.write(w)
 
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    # net = cnn.Net()
+    net = cnn.Net()
     # net = fully_connected.FF()
-    # train_classifier(net, 50, model_dir='tensorboard/S/add_500_fc')
-    train_mult()
+    train_classifier(net, 50, model_dir='tensorboard/cnn_with_chk')
+    # train_mult()

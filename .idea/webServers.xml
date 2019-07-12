@@ -10,6 +10,22 @@
           <option name="port" value="22" />
         </fileTransfer>
       </webServer>
+      <webServer id="369b31da-c5a9-4d3d-b0ab-466f78ec7678" name="nlp9" url="http://nlp09.iem.technion.ac.il">
+        <fileTransfer host="nlp09.iem.technion.ac.il" port="22" rootFolder="/home/tomer.golany@st.technion.ac.il" accessType="SFTP">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+          <option name="port" value="22" />
+        </fileTransfer>
+      </webServer>
+      <webServer id="0fb5399f-febc-4797-9733-d367be898862" name="niv1" url="http://132.68.43.102">
+        <fileTransfer host="132.68.43.102" port="22" rootFolder="/home/nivgiladi" accessType="SFTP">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+          <option name="port" value="22" />
+        </fileTransfer>
+      </webServer>
     </option>
   </component>
 </project>

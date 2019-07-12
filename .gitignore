@@ -1,2 +1,4 @@
 **/tensorboard
 **/__pycache__
+*.avi
+*.mp4

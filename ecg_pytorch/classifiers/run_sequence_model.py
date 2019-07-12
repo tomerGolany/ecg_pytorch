@@ -16,12 +16,16 @@ import logging
 import time
 import os
 import shutil
+from ecg_pytorch.gan_models import checkpoint_paths
 
 BEST_AUC_N = 0
 BEST_AUC_S = 0
 BEST_AUC_V = 0
 BEST_AUC_F = 0
 BEST_AUC_Q = 0
+
+base_local = '/Users/tomer.golany/PycharmProjects/'
+base_remote = '/home/tomer.golany@st.technion.ac.il/'
 
 
 def init_weights(m):
@@ -157,6 +161,9 @@ def train_classifier(net, model_dir, train_config=None):
 
     composed = transforms.Compose([ToTensor()])
     dataset = EcgHearBeatsDataset(transform=composed)
+    num_examples_to_add = train_config.generator_details.num_examples_to_add
+    generator_beat_type = train_config.generator_details.beat_type
+    dataset.add_noise(num_examples_to_add, generator_beat_type)
     #
     # Check if to add data from GAN #
     #
@@ -288,6 +295,7 @@ def get_gradient_norm_l2(model):
 
 
 def train_mult():
+    beat_type = 'N'
     global BEST_AUC_N
     global BEST_AUC_S
     global BEST_AUC_V
@@ -295,35 +303,98 @@ def train_mult():
     global BEST_AUC_Q
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     logging.info("Device: {}".format(device))
-    ck_path = '/home/tomer.golany@st.technion.ac.il/ecg_pytorch/ecg_pytorch/gan_models/tensorboard/ecg_dcgan_N_beat/' \
-              'checkpoint_epoch_2_iters_1819'
-    gen_details = GeneratorAdditionalDataConfig(beat_type='N', checkpoint_path=ck_path, num_examples_to_add=1500)
-    train_config = ECGTrainConfig(num_epochs=5, batch_size=20, lr=0.0002, weighted_loss=False, weighted_sampling=True,
-                                  device=device, add_data_from_gan=True, generator_details=gen_details)
-    total_runs = 0
-    while BEST_AUC_N <= 0.895:
-        if total_runs == 5:
-            break
-        if os.path.isdir(
-                '/home/tomer.golany@st.technion.ac.il/ecg_pytorch/ecg_pytorch/classifiers/tensorboard/N/lstm_add_1500/'):
-            logging.info("Removing model dir")
-            shutil.rmtree('/home/tomer.golany@st.technion.ac.il/ecg_pytorch/ecg_pytorch/classifiers/tensorboard/N/lstm_add_1500/')
-        net = lstm.ECGLSTM(5, 512, 5, 2).to(device)
-        train_classifier(net, model_dir='tensorboard//N/lstm_add_1500/', train_config=train_config)
-        total_runs += 1
-    logging.info("Done after {} runs.".format(total_runs))
-    logging.info("Best AUC:\n N: {}\tS: {}\tV: {}\tF: {}\tQ: {}".format(BEST_AUC_N, BEST_AUC_S,
-                                                                        BEST_AUC_V, BEST_AUC_F,
-                                                                        BEST_AUC_Q))
+    if beat_type == 'N':
+        ck_path = checkpoint_paths.DCGAN_N_CHK
+    elif beat_type == 'S':
+        ck_path = checkpoint_paths.DCGAN_S_CHK
+    elif beat_type == 'V':
+        ck_path = checkpoint_paths.DCGAN_V_CHK
+    elif beat_type == 'F':
+        ck_path = checkpoint_paths.DCGAN_F_CHK
+    else:
+        raise ValueError("Bad beat type")
+    with open('res_{}.text'.format(beat_type), 'w') as fd:
+        for n in [500, 800, 1000, 1500, 3000, 5000, 7000, 10000, 15000]:
+        # for n in [1500, 3000, 5000, 7000, 10000, 15000]:
+            model_dir = base_local + 'ecg_pytorch/ecg_pytorch/classifiers/tensorboard/{}/lstm_add_{}/'.format(beat_type, str(n))
+            gen_details = GeneratorAdditionalDataConfig(beat_type=beat_type, checkpoint_path=ck_path, num_examples_to_add=n)
+            train_config = ECGTrainConfig(num_epochs=5, batch_size=20, lr=0.0002, weighted_loss=False,
+                                          weighted_sampling=True,
+                                          device=device, add_data_from_gan=True, generator_details=gen_details)
+
+            total_runs = 0
+            BEST_AUC_N = 0
+            BEST_AUC_S = 0
+            BEST_AUC_V = 0
+            BEST_AUC_F = 0
+            BEST_AUC_Q = 0
+            # while BEST_AUC_S <= 0.876:
+            while total_runs < 10:
+                if os.path.isdir(model_dir):
+                    logging.info("Removing model dir")
+                    shutil.rmtree(model_dir)
+                net = lstm.ECGLSTM(5, 512, 5, 2).to(device)
+                train_classifier(net, model_dir=model_dir, train_config=train_config)
+                w_write = "AUC on RUN {}: \n N: {}\tS: {}\tV: {}\tF: {}\tQ: {}".format(total_runs, BEST_AUC_N, BEST_AUC_S,
+                                                                                BEST_AUC_V, BEST_AUC_F,
+                                                                                BEST_AUC_Q)
+                fd.write(w_write)
+                total_runs += 1
+            logging.info("Done after {} runs.".format(total_runs))
+            logging.info("Best AUC:\n N: {}\tS: {}\tV: {}\tF: {}\tQ: {}".format(BEST_AUC_N, BEST_AUC_S,
+                                                                                BEST_AUC_V, BEST_AUC_F,
+                                                                                BEST_AUC_Q))
+            w = "#n: {} .Best AUC:\n N: {}\tS: {}\tV: {}\tF: {}\tQ: {}\n".format(n, BEST_AUC_N, BEST_AUC_S,
+                                                                                BEST_AUC_V, BEST_AUC_F,
+                                                                                BEST_AUC_Q)
+            fd.write(w)
+
+
+def train_with_noise():
+    beat_type = 'N'
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    with open('res_noise_{}.text'.format(beat_type), 'w') as fd:
+        for n in [500, 800, 1000, 1500, 3000, 5000, 7000, 10000, 15000]:
+            model_dir = '/home/tomer.golany@st.technion.ac.il/ecg_pytorch/ecg_pytorch/classifiers/tensorboard/noise_{}/lstm_add_{}/'.format(
+                str(n), beat_type)
+
+            total_runs = 0
+            BEST_AUC_N = 0
+            BEST_AUC_S = 0
+            BEST_AUC_V = 0
+            BEST_AUC_F = 0
+            BEST_AUC_Q = 0
+            # while BEST_AUC_S <= 0.876:
+            while total_runs < 10:
+                if os.path.isdir(model_dir):
+                    logging.info("Removing model dir")
+                    shutil.rmtree(model_dir)
+                net = lstm.ECGLSTM(5, 512, 5, 2).to(device)
+                gen_details = GeneratorAdditionalDataConfig(beat_type=beat_type, checkpoint_path='',
+                                                            num_examples_to_add=n)
+                train_config = ECGTrainConfig(num_epochs=4, batch_size=16, lr=0.002, weighted_loss=False,
+                                              weighted_sampling=True,
+                                              device=device, add_data_from_gan=False, generator_details=gen_details)
+                train_classifier(net, model_dir=model_dir, train_config=train_config)
+                total_runs += 1
+            logging.info("Done after {} runs.".format(total_runs))
+            logging.info("Best AUC:\n N: {}\tS: {}\tV: {}\tF: {}\tQ: {}".format(BEST_AUC_N, BEST_AUC_S,
+                                                                                BEST_AUC_V, BEST_AUC_F,
+                                                                                BEST_AUC_Q))
+            w = "#n: {} .Best AUC:\n N: {}\tS: {}\tV: {}\tF: {}\tQ: {}\n".format(n, BEST_AUC_N, BEST_AUC_S,
+                                                                                 BEST_AUC_V, BEST_AUC_F,
+                                                                                 BEST_AUC_Q)
+            fd.write(w)
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
+    # logging.basicConfig(level=logging.INFO)
     # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     # logging.info("Device: {}".format(device))
     #
     # net = lstm.ECGLSTM(5, 512, 5, 2).to(device)
     # train_config = ECGTrainConfig(num_epochs=4, batch_size=16, lr=0.002, weighted_loss=False, weighted_sampling=True,
-    #                               device=device)
+    #                               device=device, add_data_from_gan=False, generator_details=None)
     # train_classifier(net, model_dir='tensorboard/lstm_adam_weighted', train_config=train_config)
     train_mult()
+    # train_with_noise()

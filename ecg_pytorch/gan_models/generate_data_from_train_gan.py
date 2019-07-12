@@ -14,6 +14,7 @@ def generate_data_from_trained_gan(generator_model, num_of_samples_to_generate, 
     """
     checkpoint = torch.load(checkpoint_path)
     generator_model.load_state_dict(checkpoint['generator_state_dict'])
+    generator_model.eval()
     # discriminator_model.load_state_dict(checkpoint['discriminator_state_dict'])
     with torch.no_grad():
         input_noise = torch.Tensor(np.random.normal(0, 1, (num_of_samples_to_generate, 100)))
