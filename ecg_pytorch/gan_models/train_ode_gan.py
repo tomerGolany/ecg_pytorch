@@ -14,6 +14,7 @@ from ecg_pytorch.dynamical_model.ode_params import ODEParams
 import math
 import logging
 import pickle
+from ecg_pytorch.dynamical_model import typical_beat_params
 
 TYPICAL_ODE_N_PARAMS = [0.7, 0.25, -0.5 * math.pi, -7.0, 0.1, -15.0 * math.pi / 180.0,
                       30.0, 0.1, 0.0 * math.pi / 180.0, -3.0, 0.1, 15.0 * math.pi / 180.0, 0.2, 0.4,
@@ -37,14 +38,26 @@ def generate_typical_N_ode_params(b_size, device):
     return params
 
 
-def ode_loss(hb_batch, ode_params):
+def generate_typical_S_ode_params(b_size, device):
+    noise_param = torch.Tensor(np.random.normal(0, 0.1, (b_size, 15))).to(device)
+    params = 0.1 * noise_param + torch.Tensor(typical_beat_params.TYPICAL_ODE_S_PARAMS).to(device)
+    return params
+
+
+def generate_typical_F_ode_params(b_size, device):
+    noise_param = torch.Tensor(np.random.normal(0, 0.1, (b_size, 15))).to(device)
+    params = 0.1 * noise_param + torch.Tensor(typical_beat_params.TYPICAL_ODE_F_PARAMS).to(device)
+    return params
+
+
+def ode_loss(hb_batch, ode_params, device, beat_type):
     """
 
     :param hb_batch:
     :return:
     """
     # print(hb_batch[:, 0])
-    device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
+    # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     delta_t = ode_params.h
     # params_one = [1.2, 0.25, -60.0 * math.pi / 180.0, -5.0, 0.1, -15.0 * math.pi / 180.0,
     #                   30.0, 0.1, 0.0 * math.pi / 180.0, -7.5, 0.1, 15.0 * math.pi / 180.0, 0.75, 0.4,
@@ -55,7 +68,16 @@ def ode_loss(hb_batch, ode_params):
     batch_size = hb_batch.size()[0]
     # params_batch = np.array([params_one for _ in range(batch_size)]).reshape((batch_size, 15))
     # params_batch = torch.Tensor(params_batch)
-    params_batch = generate_typical_N_ode_params(batch_size, device)
+
+    if beat_type == "N":
+        params_batch = generate_typical_N_ode_params(batch_size, device)
+    elif beat_type == "S":
+        params_batch = generate_typical_S_ode_params(batch_size, device)
+    elif beat_type == 'F':
+        params_batch = generate_typical_F_ode_params(batch_size, device)
+    else:
+        raise NotImplementedError()
+
     logging.debug("params batch shape: {}".format(params_batch.size()))
     x_t = torch.tensor(-0.417750770388669).to(device)
     y_t = torch.tensor(-0.9085616622823985).to(device)
@@ -106,7 +128,6 @@ def test_ode_loss():
     mse_loss = nn.MSELoss()
     loss = mse_loss(delta_hb_signal, f_ode_z_signal)
     print("LOSS: ", loss)
-
 
 
 def euler_loss(hb_batch, params_batch, x_batch, y_batch, ode_params):
@@ -170,39 +191,57 @@ def euler_loss(hb_batch, params_batch, x_batch, y_batch, ode_params):
     return delta_hb_signal, f_ode_z_signal, f_ode_x_signal, f_ode_y_signal, delta_x_signal, delta_y_signal
 
 
-def train(batch_size, num_train_steps, model_dir):
+def train(batch_size, num_train_steps, model_dir, beat_type):
+
     device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
     ode_params = ODEParams(device)
+
+    #
     # Support for tensorboard:
+    #
     writer = SummaryWriter(model_dir)
+
+    #
     # 1. create the ECG dataset:
+    #
     composed = transforms.Compose([ecg_dataset.Scale(), ecg_dataset.ToTensor()])
-    dataset = ecg_dataset.EcgHearBeatsDataset(transform=composed, beat_type='N')
+    dataset = ecg_dataset.EcgHearBeatsDataset(transform=composed, beat_type=beat_type)
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size,
                                              shuffle=True, num_workers=1)
     print("Size of real dataset is {}".format(len(dataset)))
 
+    #
     # 2. Create the models:
-    # netG = ode_gan.ODEGenerator()
+    #
     netG = ode_gan_aaai.DCGenerator(0).to(device)
     netD = ode_gan_aaai.DCDiscriminator(0).to(device)
     netD.apply(weights_init)
     netG.apply(weights_init)
 
-
-    # Loss functions:
+    #
+    # Define loss functions:
+    #
     cross_entropy_loss = nn.BCELoss()
     mse_loss = nn.MSELoss()
-    # mse_loss = nn.L1Loss()
+
+    #
     # Optimizers:
+    #
     lr = 0.0002
     beta1 = 0.5
     writer.add_scalar('Learning_Rate', lr)
     optimizer_d = optim.Adam(netD.parameters(), lr=lr, betas=(beta1, 0.999))
     optimizer_g = optim.Adam(netG.parameters(), lr=lr, betas=(beta1, 0.999))
 
+    #
     # Noise for validation:
-    val_noise = torch.Tensor(np.random.normal(0, 1, (4, 100))).to(device)
+    #
+    val_noise = torch.Tensor(np.random.uniform(0, 1, (4, 100))).to(device)
+    # val_noise = torch.Tensor(np.random.normal(0, 1, (4, 100))).to(device)
+
+    #
+    # Training loop"
+    #
     epoch = 0
     iters = 0
     while True:
@@ -214,6 +253,10 @@ def train(batch_size, num_train_steps, model_dir):
                 break
 
             netD.zero_grad()
+
+            #
+            # Discriminator from real beats:
+            #
             ecg_batch = data['cardiac_cycle'].float().to(device)
             b_size = ecg_batch.shape[0]
 
@@ -227,7 +270,12 @@ def train(batch_size, num_train_steps, model_dir):
                                global_step=iters)
             ce_loss_d_real.backward()
             mean_d_real_output = output.mean().item()
-            noise_input = torch.Tensor(np.random.normal(0, 1, (b_size, 100))).to(device)
+
+            #
+            # Discriminator from fake beats:
+            #
+            noise_input = torch.Tensor(np.random.uniform(0, 1, (b_size, 100))).to(device)
+            # noise_input = torch.Tensor(np.random.normal(0, 1, (b_size, 100))).to(device)
 
             output_g_fake = netG(noise_input)
             output = netD(output_g_fake.detach()).to(device)
@@ -249,14 +297,11 @@ def train(batch_size, num_train_steps, model_dir):
             labels.fill_(1)
             output = netD(output_g_fake)
 
-            ##
+            #
             # Add euler loss:
-            ##
-            # delta_hb_signal, f_ode_z_signal, f_ode_x_signal, f_ode_y_signal, delta_x_signal, delta_y_signal = euler_loss(output_g_fake, output_ode_params, x_signal, y_signal, ode_params)
-            delta_hb_signal, f_ode_z_signal = ode_loss(output_g_fake, ode_params)
+            #
+            delta_hb_signal, f_ode_z_signal = ode_loss(output_g_fake, ode_params, device, beat_type)
             mse_loss_euler = mse_loss(delta_hb_signal, f_ode_z_signal)
-            # mse_x = mse_loss(delta_x_signal, f_ode_x_signal)
-            # mse_y = mse_loss(delta_y_signal, f_ode_y_signal)
             logging.info("MSE ODE loss: {}".format(mse_loss_euler.item()))
             ce_loss_g_fake = cross_entropy_loss(output, labels)
             total_g_loss = mse_loss_euler + ce_loss_g_fake
@@ -264,8 +309,6 @@ def train(batch_size, num_train_steps, model_dir):
             total_g_loss.backward()
 
             writer.add_scalar(tag='Generator/mse_ode', scalar_value=mse_loss_euler.item(), global_step=iters)
-            # writer.add_scalar(tag='Generator/mse_x', scalar_value=mse_x.item(), global_step=iters)
-            # writer.add_scalar(tag='Generator/mse_y', scalar_value=mse_y.item(), global_step=iters)
             writer.add_scalar(tag='Generator/cross_entropy_on_fake_batch', scalar_value=ce_loss_g_fake.item(),
                               global_step=iters)
             writer.add_scalars('Merged/losses', {'g_cross_entropy_on_fake_batch': ce_loss_g_fake.item()},
@@ -273,6 +316,7 @@ def train(batch_size, num_train_steps, model_dir):
             mean_d_fake_output_2 = output.mean().item()
 
             optimizer_g.step()
+
             if iters % 50 == 0:
                 print("{}/{}: Epoch #{}: Iteration #{}: Mean D(real_hb_batch) = {}, mean D(G(z)) = {}."
                       .format(num_of_beats_seen, len(dataset), epoch, iters, mean_d_real_output, mean_d_fake_output),
@@ -283,8 +327,9 @@ def train(batch_size, num_train_steps, model_dir):
                       format(ce_loss_d_real, ce_loss_d_fake, total_loss_d), end=" ")
                 print("Loss G = {}".format(ce_loss_g_fake))
 
-
+            #
             # Norma of gradients:
+            #
             gNormGrad = get_gradient_norm_l2(netG)
             dNormGrad = get_gradient_norm_l2(netD)
             writer.add_scalar('Generator/gradients_norm', gNormGrad, iters)
@@ -334,6 +379,6 @@ def get_gradient_norm_l2(model):
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    model_dir = 'tensorboard/ode_gan_aaai/ecg_ode_gan_N_beat_v2'
-    train(100, 10000, model_dir)
-    # test_ode_loss()
+    model_dir = 'tensorboard/ecg_ode_gan_F_beat/'
+    beat_type = 'F'
+    train(150, 5000, model_dir, beat_type)

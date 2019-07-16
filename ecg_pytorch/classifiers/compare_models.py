@@ -32,6 +32,10 @@ lstm_auc_Q = [0.83]
 ##
 noise_N = []
 
+#
+# ODE GAN - Best scores:
+#
+ODE_N = []
 
 # create a new plot with a title and axis labels
 p = figure(title="Average AUC comparison on classifying heartbeat of type N - Normal beats",

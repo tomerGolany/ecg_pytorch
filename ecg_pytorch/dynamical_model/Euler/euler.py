@@ -69,7 +69,7 @@ def euler(params_batch, device_name, v0):
     # z = torch.tensor(-0.004551233843726818).to(device_name)
 
     res = []
-    print(len(params_batch))
+    # print(len(params_batch))
     for j, params in enumerate(params_batch):
         z = torch.tensor(v0[j]).to(device_name)
         t = torch.tensor(0.0).to(device_name)

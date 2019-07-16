@@ -35,7 +35,7 @@ def eval_model(model, model_chk, patient_number):
     model.load_state_dict(checkpoint['net'])
     model.eval()
     fourcc = cv2.VideoWriter_fourcc('P', 'N', 'G', ' ')
-    out = cv2.VideoWriter('train/patient_{}_inference_fc.avi'.format(patient_number), fourcc,  15, (640, 480))
+    out = cv2.VideoWriter('test/patient_{}_inference_fc.avi'.format(patient_number), fourcc,  4, (640, 480))
 
     softmax = torch.nn.Softmax()
     with torch.no_grad():
@@ -88,4 +88,4 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.WARNING)
     ff = fully_connected.FF()
     model_chk = checkpoint_paths.FF_CHECKPOINT_PATH
-    eval_model(ff, model_chk, patient_number='109')
+    eval_model(ff, model_chk, patient_number='117')

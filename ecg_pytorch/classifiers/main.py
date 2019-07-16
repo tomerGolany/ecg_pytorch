@@ -19,8 +19,12 @@ import os
 import logging
 from ecg_pytorch.gan_models.models.old_ode_combined import CombinedGenerator as CG
 from ecg_pytorch.gan_models import checkpoint_paths
+import pickle
 
-AUC_VALUE = 0
+base_local = '/Users/tomer.golany/PycharmProjects/'
+base_remote = '/home/tomer.golany@st.technion.ac.il/'
+base_niv_remote = '/home/nivgiladi/tomer/'
+BEAT_TO_INDEX = {'N': 0, 'S': 1, 'V': 2, 'F': 3, 'Q': 4}
 
 
 def plt_roc_curve(y_true, y_pred, classes, writer, total_iters):
@@ -31,19 +35,15 @@ def plt_roc_curve(y_true, y_pred, classes, writer, total_iters):
     :param classes:5
     :return:
     """
-    global AUC_VALUE
     fpr = {}
     tpr = {}
     roc_auc = {}
+    roc_auc_res = []
     n_classes = len(classes)
     for i in range(n_classes):
         fpr[classes[i]], tpr[classes[i]], _ = roc_curve(y_true[:, i], y_pred[:, i])
         roc_auc[classes[i]] = auc(fpr[classes[i]], tpr[classes[i]])
-        if i == 0:
-            curr_auc = roc_auc[classes[i]]
-            if curr_auc > AUC_VALUE:
-                logging.info("New maxumal AUC: {}".format(AUC_VALUE))
-                AUC_VALUE = curr_auc
+        roc_auc_res.append(roc_auc[classes[i]])
         fig = plt.figure()
         lw = 2
         plt.plot(fpr[classes[i]], tpr[classes[i]], color='darkorange',
@@ -59,6 +59,7 @@ def plt_roc_curve(y_true, y_pred, classes, writer, total_iters):
         plt.close()
         fig.clf()
         fig.clear()
+    return roc_auc_res
 
 
 def plot_confusion_matrix(y_true, y_pred, classes,
@@ -115,21 +116,26 @@ def plot_confusion_matrix(y_true, y_pred, classes,
     return fig, ax
 
 
-def train_classifier(net, batch_size, model_dir, n=0, ch_path=None, beat_type=None):
+def train_classifier(net, batch_size, model_dir, n=0, ch_path=None, beat_type=None, gan_type=None):
     """
 
     :param network:
     :return:
     """
-    global AUC_VALUE
+    best_auc_scores = [0, 0, 0, 0]
     if os.path.isdir(model_dir):
         shutil.rmtree(model_dir)
     composed = transforms.Compose([ecg_dataset.ToTensor()])
     dataset = ecg_dataset.EcgHearBeatsDataset(transform=composed)
     # gNet = CG(0, 'cpu')
     if n != 0:
-        gNet = ode_gan_aaai.DCGenerator(0)
-
+        if gan_type == 'DCGAN':
+            gNet = dcgan.DCGenerator(0)
+        elif gan_type == 'ODE_GAN':
+            gNet = ode_gan_aaai.DCGenerator(0)
+        else:
+            raise ValueError("Unknown gan type {}".format(gan_type))
+        # gNet = ode_gan_aaai.DCGenerator(0)
         dataset.add_beats_from_generator(gNet, n, ch_path, beat_type)
     # gNet = dcgan.DCGenerator(0)
     # checkpoint_path = '/Users/tomer.golany/PycharmProjects/ecg_pytorch/ecg_pytorch/gan_models/tensorboard/ecg_dcgan_V_beat/' \
@@ -149,7 +155,7 @@ def train_classifier(net, batch_size, model_dir, n=0, ch_path=None, beat_type=No
 
     testset = ecg_dataset.EcgHearBeatsDatasetTest(transform=composed)
     testdataloader = torch.utils.data.DataLoader(testset, batch_size=batch_size,
-                                             shuffle=True, num_workers=1)
+                                                 shuffle=True, num_workers=1)
 
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(net.parameters(), lr=0.0001)
@@ -160,8 +166,8 @@ def train_classifier(net, batch_size, model_dir, n=0, ch_path=None, beat_type=No
         for i, data in enumerate(dataloader):
             total_iters += 1
             # get the inputs
-            ecg_batch = data['cardiac_cycle'].view(-1, 1, 216).float()
-            # ecg_batch = data['cardiac_cycle'].float()
+            # ecg_batch = data['cardiac_cycle'].view(-1, 1, 216).float()
+            ecg_batch = data['cardiac_cycle'].float()
             b_size = ecg_batch.shape[0]
             labels = data['label']
             labels_class = torch.max(labels, 1)[1]
@@ -182,7 +188,8 @@ def train_classifier(net, batch_size, model_dir, n=0, ch_path=None, beat_type=No
             print("Epoch {}. Iteration {}.\t Batch loss = {:.2f}. Accuracy = {:.2f}".format(epoch + 1, i, loss.item(),
                                                                                             accuracy.item()))
             if total_iters % 50 == 0:
-                fig, _ = plot_confusion_matrix(labels_class.numpy(), outputs_class.numpy(), np.array(['N', 'S', 'V', 'F', 'Q']))
+                fig, _ = plot_confusion_matrix(labels_class.numpy(), outputs_class.numpy(),
+                                               np.array(['N', 'S', 'V', 'F', 'Q']))
                 writer.add_figure('train/confusion_matrix', fig, total_iters)
 
             if total_iters % 200 == 0:
@@ -193,8 +200,8 @@ def train_classifier(net, batch_size, model_dir, n=0, ch_path=None, beat_type=No
                     outputs_total = np.array([])
                     loss_hist = []
                     for _, test_data in enumerate(testdataloader):
-                        ecg_batch = test_data['cardiac_cycle'].view(-1, 1, 216).float()
-                        # ecg_batch = test_data['cardiac_cycle'].float()
+                        # ecg_batch = test_data['cardiac_cycle'].view(-1, 1, 216).float()
+                        ecg_batch = test_data['cardiac_cycle'].float()
                         labels = test_data['label']
                         labels_class = torch.max(labels, 1)[1]
                         outputs = net(ecg_batch)
@@ -217,37 +224,77 @@ def train_classifier(net, batch_size, model_dir, n=0, ch_path=None, beat_type=No
                     writer.add_figure('test/confusion_matrix', fig, total_iters)
                     loss = sum(loss_hist) / len(loss_hist)
                     writer.add_scalars('Cross_entropy_loss', {'Test set loss': loss}, total_iters)
-                    plt_roc_curve(labels_total_one_hot, outputs_preds, np.array(['N', 'S', 'V', 'F', 'Q']), writer, total_iters)
+                    auc_roc = plt_roc_curve(labels_total_one_hot, outputs_preds, np.array(['N', 'S', 'V', 'F', 'Q']),
+                                            writer, total_iters)
 
+                    for i_auc in range(4):
+                        if auc_roc[i_auc] > best_auc_scores[i_auc]:
+                            best_auc_scores[i_auc] = auc_roc[i_auc]
     torch.save({
         'net': net.state_dict()
     }, model_dir + '/checkpoint_epoch_iters_{}'.format(total_iters))
     writer.close()
+    return best_auc_scores
 
 
-def train_mult():
-    # model_dir = 'tensorboard/N/add_{}_fc_ode_gan/'
-    ch_ppath = checkpoint_paths.ODE_GAN_N_CHK
-    beat_type = 'N'
+def train_mult(beat_type, gan_type):
+    #
+    # Retrieve Checkpoint path:
+    #
+    ck_path = checkpoint_paths.BEAT_AND_MODEL_TO_CHECKPOINT_PATH[beat_type][gan_type]
 
-    with open('N_fc_ode_res.txt', 'w') as fd:
-        for n in [500, 800, 1000, 1500, 3000, 5000, 7000, 10000, 15000]:
-            num_runs = 0
-            AUC_VALUE = 0
-            while num_runs < 10:
-                net = fully_connected.FF()
-                logging.info("AUC VALUE: {}".format(AUC_VALUE))
-                model_dir = 'tensorboard/N/add_{}_fc_ode_gan/'.format(str(n))
-                train_classifier(net, 50, model_dir=model_dir, n=n, ch_path=ch_ppath, beat_type=beat_type)
-                num_runs += 1
-            logging.info("Best AUC VALUE: {}".format(AUC_VALUE))
-            w = "{} : {}".format(str(n), str(AUC_VALUE))
-            fd.write(w)
+    #
+    # Define summary values:
+    #
+    mean_auc_values = []
+    var_auc_values = []
+    best_auc_values = []
+
+    best_auc_for_each_n = {}
+    #
+    # Run with different number of additional data from trained generator:
+    #
+    for n in [0, 500, 800, 1000, 1500, 3000, 5000, 7000, 10000, 15000]:
+
+        model_dir = 'tensorboard/{}/add_{}_{}_fc/'.format(beat_type, str(n), gan_type)
+        #
+        # Run 10 times each configuration:
+        #
+        num_runs = 0
+        best_auc_per_run = []
+        while num_runs < 10:
+            #
+            # Initialize the network each run:
+            #
+            net = fully_connected.FF()
+
+            #
+            # Train the classifier:
+            #
+            best_auc_scores = train_classifier(net, 50, model_dir=model_dir, n=n, ch_path=ck_path, beat_type=beat_type,
+                                               gan_type=gan_type)
+
+            best_auc_per_run.append(best_auc_scores[BEAT_TO_INDEX[beat_type]])
+            num_runs += 1
+
+        best_auc_for_each_n[n] = best_auc_per_run
+        mean_auc_values.append(np.mean(best_auc_per_run))
+        var_auc_values.append(np.var(best_auc_per_run))
+        best_auc_values.append(max(best_auc_per_run))
+
+    #
+    # Save data in pickle:
+    #
+    all_results = {'best_auc_for_each_n': best_auc_for_each_n, 'mean': mean_auc_values, 'var': var_auc_values,
+                   'best': best_auc_values}
+    pickle_file_path = base_niv_remote + 'ecg_pytorch/ecg_pytorch/classifiers/pickles_results/{}_{}_fc.pkl'.format(
+        beat_type, gan_type)
+    with open(pickle_file_path, 'wb') as handle:
+        pickle.dump(all_results, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    net = cnn.Net()
-    # net = fully_connected.FF()
-    train_classifier(net, 50, model_dir='tensorboard/cnn_with_chk')
-    # train_mult()
+    beat_type = 'N'
+    gan_type = 'ODE_GAN'
+    train_mult(beat_type, gan_type)

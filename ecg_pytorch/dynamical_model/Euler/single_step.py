@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 
 class ODEParams:
     def __init__(self, device_name):
-        self.h = torch.tensor(1 / 216).to('cpu')
+        # self.h = torch.tensor(1 / 216).to('cpu')
         self.A = torch.tensor(0.005).to(device_name)  # mV
         self.f1 = torch.tensor(0.1).to(device_name)  # mean 1
         self.f2 = torch.tensor(0.25).to(device_name)  # mean 2

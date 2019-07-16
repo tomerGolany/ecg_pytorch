@@ -5,4 +5,4 @@ ECGTrainConfig = namedtuple('ECGTrainConfig',
                             'from_gan generator_details')
 
 GeneratorAdditionalDataConfig = namedtuple('GeneratorAdditionalDataConfig', 'beat_type checkpoint_path num_examples_to_'
-                                                                            'add')
+                                                                            'add gan_type')

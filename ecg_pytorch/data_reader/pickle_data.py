@@ -1,7 +1,11 @@
 import pickle
 
-full_path = '/Users/tomer.golany/PycharmProjects/ecg_pytorch/ecg_pytorch/data_reader'
+niv_remote = '/home/nivgiladi/tomer/'
+local_base = '/Users/tomer.golany/PycharmProjects/'
+nlp_base = '/home/tomer.golany@st.technion.ac.il/'
+full_path = local_base + 'ecg_pytorch/ecg_pytorch/data_reader'
 # full_path = '/home/tomer.golany@st.technion.ac.il/ecg_pytorch/ecg_pytorch/data_reader'
+
 
 def load_ecg_input_from_pickle():
     with open(full_path + '/train_beats.pickle', 'rb') as handle:

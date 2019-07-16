@@ -8,21 +8,21 @@ class DCGenerator(nn.Module):
         ngf = 64
         self.main = nn.Sequential(
             # shape in = [N, 50, 1]
-            nn.ConvTranspose1d(100, ngf * 32, 4, 1, 0, bias=False),
+            nn.ConvTranspose1d(100, ngf * 32, 4, 1, 0, bias=True),
             nn.BatchNorm1d(ngf * 32),
             nn.ReLU(True),
             # shape in = [N, 64*4, 4]
-            nn.ConvTranspose1d(ngf * 32, ngf * 16, 4, 1, 0, bias=False),
+            nn.ConvTranspose1d(ngf * 32, ngf * 16, 4, 1, 0, bias=True),
             nn.BatchNorm1d(ngf * 16),
             nn.ReLU(True),
             # shape in = [N, 64*2, 7]
-            nn.ConvTranspose1d(ngf * 16, ngf * 8, 4, 2, 1, bias=False),
+            nn.ConvTranspose1d(ngf * 16, ngf * 8, 4, 2, 1, bias=True),
             nn.BatchNorm1d(ngf * 8),
             nn.ReLU(True),
-            nn.ConvTranspose1d(ngf * 8, ngf * 4, 3, 2, 1, bias=False),
+            nn.ConvTranspose1d(ngf * 8, ngf * 4, 3, 2, 1, bias=True),
             nn.BatchNorm1d(ngf * 4),
             nn.ReLU(True),
-            nn.ConvTranspose1d(ngf * 4, ngf * 2, 4, 2, 1, bias=False),
+            nn.ConvTranspose1d(ngf * 4, ngf * 2, 4, 2, 1, bias=True),
             nn.BatchNorm1d(ngf * 2),
             nn.ReLU(True),
             nn.ConvTranspose1d(ngf * 2, ngf, 4, 2, 1, bias=True),
