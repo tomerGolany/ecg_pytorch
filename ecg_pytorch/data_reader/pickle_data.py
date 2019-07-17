@@ -1,11 +1,7 @@
 import pickle
+from ecg_pytorch import train_configs
 
-niv_remote = '/home/nivgiladi/tomer/'
-local_base = '/Users/tomer.golany/PycharmProjects/'
-nlp_base = '/home/tomer.golany@st.technion.ac.il/'
-tomer_remote = '/home/tomer/tomer/'
-full_path = local_base + 'ecg_pytorch/ecg_pytorch/data_reader'
-# full_path = '/home/tomer.golany@st.technion.ac.il/ecg_pytorch/ecg_pytorch/data_reader'
+full_path = train_configs.base + 'ecg_pytorch/ecg_pytorch/data_reader'
 
 
 def load_ecg_input_from_pickle():
@@ -20,4 +16,3 @@ def load_ecg_input_from_pickle():
 
 if __name__ == "__main__":
     pass
-    # create_ecg_input_pickle()

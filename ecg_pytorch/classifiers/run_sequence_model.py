@@ -19,11 +19,9 @@ from ecg_pytorch.gan_models.models import ode_gan_aaai
 import shutil
 from ecg_pytorch.gan_models import checkpoint_paths
 import pickle
+from ecg_pytorch import train_configs
+base_path = train_configs.base
 
-base_local = '/Users/tomer.golany/PycharmProjects/'
-base_remote = '/home/tomer.golany@st.technion.ac.il/'
-base_niv_remote = '/home/nivgiladi/tomer/'
-base_tomer_remote = '/home/tomer/tomer/'
 
 BEAT_TO_INDEX = {'N': 0, 'S': 1, 'V': 2, 'F': 3, 'Q': 4}
 
@@ -302,7 +300,7 @@ def get_gradient_norm_l2(model):
 
 def train_mult(beat_type, gan_type, device):
 
-    summary_model_dir = base_tomer_remote + 'ecg_pytorch/ecg_pytorch/classifiers/tensorboard/{}/lstm_{}_summary/'.format(
+    summary_model_dir = base_path + 'ecg_pytorch/ecg_pytorch/classifiers/tensorboard/{}/lstm_{}_summary/'.format(
             beat_type, gan_type)
     writer = SummaryWriter(summary_model_dir)
     #
@@ -325,7 +323,7 @@ def train_mult(beat_type, gan_type, device):
         #
         # Train configurations:
         #
-        model_dir = base_tomer_remote + 'ecg_pytorch/ecg_pytorch/classifiers/tensorboard/{}/lstm_{}_{}/'.format(
+        model_dir = base_path + 'ecg_pytorch/ecg_pytorch/classifiers/tensorboard/{}/lstm_{}_{}/'.format(
             beat_type, str(n), gan_type)
         gen_details = GeneratorAdditionalDataConfig(beat_type=beat_type, checkpoint_path=ck_path,
                                                     num_examples_to_add=n, gan_type=gan_type)
@@ -366,14 +364,14 @@ def train_mult(beat_type, gan_type, device):
     #
     all_results = {'best_auc_for_each_n': best_auc_for_each_n, 'mean': mean_auc_values, 'var': var_auc_values,
                    'best': best_auc_values}
-    pickle_file_path = base_tomer_remote + 'ecg_pytorch/ecg_pytorch/classifiers/pickles_results/{}_{}_lstm.pkl'.format(
+    pickle_file_path = base_path + 'ecg_pytorch/ecg_pytorch/classifiers/pickles_results/{}_{}_lstm.pkl'.format(
         beat_type, gan_type)
     with open(pickle_file_path, 'wb') as handle:
         pickle.dump(all_results, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 
 def find_optimal_checkpoint(chk_dir, beat_type, gan_type, device, num_samples_to_add):
-    model_dir = base_tomer_remote + 'ecg_pytorch/ecg_pytorch/classifiers/tensorboard/{}/find_optimal_chk_{}_{}_agg/'\
+    model_dir = base_path + 'ecg_pytorch/ecg_pytorch/classifiers/tensorboard/{}/find_optimal_chk_{}_{}_agg/'\
         .format(beat_type, str(num_samples_to_add), gan_type)
 
     writer = SummaryWriter(model_dir)
@@ -393,7 +391,7 @@ def find_optimal_checkpoint(chk_dir, beat_type, gan_type, device, num_samples_to
             #
             # Train configurations:
             #
-            model_dir = base_tomer_remote + 'ecg_pytorch/ecg_pytorch/classifiers/tensorboard/{}/lstm_{}_{}_{}/'.format(
+            model_dir = base_path + 'ecg_pytorch/ecg_pytorch/classifiers/tensorboard/{}/lstm_{}_{}_{}/'.format(
                 beat_type, str(num_samples_to_add), gan_type, chk_name)
             gen_details = GeneratorAdditionalDataConfig(beat_type=beat_type, checkpoint_path=chk_path,
                                                         num_examples_to_add=num_samples_to_add, gan_type=gan_type)
@@ -436,7 +434,7 @@ def find_optimal_checkpoint(chk_dir, beat_type, gan_type, device, num_samples_to
     #
     # Save data in pickle:
     #
-    pickle_file_path = base_tomer_remote + 'ecg_pytorch/ecg_pytorch/classifiers/pickles_results/{}_{}_lstm_different_ckps_500.pkl'.format(
+    pickle_file_path = base_path + 'ecg_pytorch/ecg_pytorch/classifiers/pickles_results/{}_{}_lstm_different_ckps_500.pkl'.format(
         beat_type, gan_type)
     with open(pickle_file_path, 'wb') as handle:
         pickle.dump(final_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)

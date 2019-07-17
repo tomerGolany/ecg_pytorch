@@ -1,17 +1,6 @@
-base_local = '/Users/tomer.golany/PycharmProjects/'
-base_remote = '/home/tomer.golany@st.technion.ac.il/'
-base_niv_remote = '/home/nivgiladi/tomer/'
-base_tomer_remote = '/home/tomer/tomer/'
+from ecg_pytorch import train_configs
 
-use_type = 'TOMER'
-if use_type == 'LOCAL':
-    base_path = base_local
-elif use_type == 'NLP':
-    base_path = base_remote
-elif use_type == "NIV":
-    base_path = base_niv_remote
-elif use_type == "TOMER":
-    base_path = base_tomer_remote
+base_path = train_configs.base
 #
 # ODE GAN N:
 #
