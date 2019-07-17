@@ -23,6 +23,8 @@ import pickle
 base_local = '/Users/tomer.golany/PycharmProjects/'
 base_remote = '/home/tomer.golany@st.technion.ac.il/'
 base_niv_remote = '/home/nivgiladi/tomer/'
+base_tomer_remote = '/home/tomer/tomer/'
+
 BEAT_TO_INDEX = {'N': 0, 'S': 1, 'V': 2, 'F': 3, 'Q': 4}
 
 
@@ -88,11 +90,12 @@ def plot_confusion_matrix(y_true, y_pred, classes,
     classes = classes[unique_labels(y_true, y_pred)]
     if normalize:
         cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
-        print("Normalized confusion matrix")
+        # print("Normalized confusion matrix")
     else:
-        print('Confusion matrix, without normalization')
+        pass
+        # print('Confusion matrix, without normalization')
 
-    print(cm)
+    # print(cm)
 
     fig, ax = plt.subplots()
     im = ax.imshow(cm, interpolation='nearest', cmap=cmap)
@@ -145,13 +148,19 @@ def train_classifier(net, model_dir, train_config=None):
     dataset.add_noise(num_examples_to_add, generator_beat_type)
 
     #
-    # Check if to add data from GAN #
+    # Check if to add data from GAN:
     #
     if add_from_gan:
+
         num_examples_to_add = train_config.generator_details.num_examples_to_add
         generator_checkpoint_path = train_config.generator_details.checkpoint_path
         generator_beat_type = train_config.generator_details.beat_type
         gan_type = train_config.generator_details.gan_type
+        logging.info("Adding {} samples of type {} from GAN {}".format(num_examples_to_add, generator_beat_type,
+                                                                       gan_type))
+        logging.info("Size of training data before additional data from GAN: {}".format(len(dataset)))
+        logging.info("#N: {}\t #S: {}\t #V: {}\t #F: {}\t".format(dataset.len_beat('N'), dataset.len_beat('S'),
+                                                                  dataset.len_beat('V'), dataset.len_beat('F')))
         if gan_type == 'DCGAN':
             gNet = dcgan.DCGenerator(0)
         elif gan_type == 'ODE_GAN':
@@ -162,6 +171,9 @@ def train_classifier(net, model_dir, train_config=None):
         dataset.add_beats_from_generator(gNet, num_examples_to_add,
                                          generator_checkpoint_path,
                                          generator_beat_type)
+        logging.info("Size of training data after additional data from GAN: {}".format(len(dataset)))
+        logging.info("#N: {}\t #S: {}\t #V: {}\t #F: {}\t".format(dataset.len_beat('N'), dataset.len_beat('S'),
+                                                                  dataset.len_beat('V'), dataset.len_beat('F')))
 
     if train_config.weighted_sampling:
         weights_for_balance = dataset.make_weights_for_balanced_classes()
@@ -207,12 +219,16 @@ def train_classifier(net, model_dir, train_config=None):
             optimizer.step()
             writer.add_scalars('cross_entropy_loss', {'Train batches loss': loss.item()}, total_iters)
             writer.add_scalars('accuracy', {'Train batches accuracy': accuracy.item()}, total_iters)
+
+            #
             # print statistics
-            logging.info("Epoch {}. Iteration {}/{}.\t Batch loss = {:.2f}. Accuracy = {:.2f}".format(epoch + 1, i,
-                                                                                                      num_iters_per_epoch,
-                                                                                                      loss.item(),
-                                                                                                      accuracy.item()))
-            if total_iters % 50 == 0:
+            #
+            if total_iters % 1000 == 0:
+                logging.info("Epoch {}. Iteration {}/{}.\t Batch loss = {:.2f}. Accuracy = {:.2f}".format(epoch + 1, i,
+                                                                                                          num_iters_per_epoch,
+                                                                                                          loss.item(),
+                                                                                                          accuracy.item()))
+            if total_iters % 3000 == 0:
                 fig, _ = plot_confusion_matrix(labels_class.cpu().numpy(), outputs_class.cpu().numpy(),
                                                np.array(['N', 'S', 'V', 'F', 'Q']))
                 # fig, _ = plot_confusion_matrix(labels_class.numpy(), outputs_class.numpy(),
@@ -248,7 +264,7 @@ def train_classifier(net, model_dir, train_config=None):
                         outputs_total = np.concatenate((outputs_total, outputs_class.cpu().numpy()))
                         outputs_preds = np.concatenate((outputs_preds, outputs.cpu().numpy()))
                     end = time.time()
-                    print("Test evaluation took {:.2f} seconds".format(end - start))
+                    # print("Test evaluation took {:.2f} seconds".format(end - start))
                     outputs_total = outputs_total.astype(int)
                     labels_total = labels_total.astype(int)
                     fig, _ = plot_confusion_matrix(labels_total, outputs_total,
@@ -285,6 +301,10 @@ def get_gradient_norm_l2(model):
 
 
 def train_mult(beat_type, gan_type, device):
+
+    summary_model_dir = base_tomer_remote + 'ecg_pytorch/ecg_pytorch/classifiers/tensorboard/{}/lstm_{}_summary/'.format(
+            beat_type, gan_type)
+    writer = SummaryWriter(summary_model_dir)
     #
     # Retrieve Checkpoint path:
     #
@@ -305,13 +325,13 @@ def train_mult(beat_type, gan_type, device):
         #
         # Train configurations:
         #
-        model_dir = base_niv_remote + 'ecg_pytorch/ecg_pytorch/classifiers/tensorboard/{}/lstm_{}_{}/'.format(
+        model_dir = base_tomer_remote + 'ecg_pytorch/ecg_pytorch/classifiers/tensorboard/{}/lstm_{}_{}/'.format(
             beat_type, str(n), gan_type)
         gen_details = GeneratorAdditionalDataConfig(beat_type=beat_type, checkpoint_path=ck_path,
                                                     num_examples_to_add=n, gan_type=gan_type)
         train_config = ECGTrainConfig(num_epochs=5, batch_size=20, lr=0.0002, weighted_loss=False,
                                       weighted_sampling=True,
-                                      device=device, add_data_from_gan=False, generator_details=gen_details)
+                                      device=device, add_data_from_gan=True, generator_details=gen_details)
         #
         # Run 10 times each configuration:
         #
@@ -331,20 +351,95 @@ def train_mult(beat_type, gan_type, device):
             #
             best_auc_scores = train_classifier(net, model_dir=model_dir, train_config=train_config)
             best_auc_per_run.append(best_auc_scores[BEAT_TO_INDEX[beat_type]])
+            writer.add_scalar('auc_with_additional_{}_beats'.format(n), best_auc_scores[BEAT_TO_INDEX[beat_type]],
+                              total_runs)
             total_runs += 1
         best_auc_for_each_n[n] = best_auc_per_run
         mean_auc_values.append(np.mean(best_auc_per_run))
         var_auc_values.append(np.var(best_auc_per_run))
         best_auc_values.append(max(best_auc_per_run))
-
+        writer.add_scalar('mean_auc', np.mean(best_auc_per_run), n)
+        writer.add_scalar('max_auc', max(best_auc_per_run), n)
+    writer.close()
     #
     # Save data in pickle:
     #
-    all_results = {'best_auc_for_each_n': best_auc_for_each_n, 'mean': mean_auc_values, 'var': var_auc_values, 'best': best_auc_values}
-    pickle_file_path = base_niv_remote + 'ecg_pytorch/ecg_pytorch/classifiers/pickles_results/{}_{}_lstm.pkl'.format(
+    all_results = {'best_auc_for_each_n': best_auc_for_each_n, 'mean': mean_auc_values, 'var': var_auc_values,
+                   'best': best_auc_values}
+    pickle_file_path = base_tomer_remote + 'ecg_pytorch/ecg_pytorch/classifiers/pickles_results/{}_{}_lstm.pkl'.format(
         beat_type, gan_type)
     with open(pickle_file_path, 'wb') as handle:
         pickle.dump(all_results, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+
+def find_optimal_checkpoint(chk_dir, beat_type, gan_type, device, num_samples_to_add):
+    model_dir = base_tomer_remote + 'ecg_pytorch/ecg_pytorch/classifiers/tensorboard/{}/find_optimal_chk_{}_{}_agg/'\
+        .format(beat_type, str(num_samples_to_add), gan_type)
+
+    writer = SummaryWriter(model_dir)
+    if not os.path.isdir(chk_dir):
+        raise ValueError("{} not a directory".format(chk_dir))
+
+    #
+    # Define summary values:
+    #
+    mean_auc_values = []
+    best_auc_values = []
+    final_dict = {}
+    for i, chk_name in enumerate(os.listdir(chk_dir)):
+        if chk_name.startswith('checkpoint'):
+            chk_path = os.path.join(chk_dir, chk_name)
+
+            #
+            # Train configurations:
+            #
+            model_dir = base_tomer_remote + 'ecg_pytorch/ecg_pytorch/classifiers/tensorboard/{}/lstm_{}_{}_{}/'.format(
+                beat_type, str(num_samples_to_add), gan_type, chk_name)
+            gen_details = GeneratorAdditionalDataConfig(beat_type=beat_type, checkpoint_path=chk_path,
+                                                        num_examples_to_add=num_samples_to_add, gan_type=gan_type)
+            train_config = ECGTrainConfig(num_epochs=5, batch_size=20, lr=0.0002, weighted_loss=False,
+                                          weighted_sampling=True,
+                                          device=device, add_data_from_gan=True, generator_details=gen_details)
+            #
+            # Run 10 times each configuration:
+            #
+            total_runs = 0
+            best_auc_per_run = []
+            while total_runs < 10:
+                if os.path.isdir(model_dir):
+                    logging.info("Removing model dir")
+                    shutil.rmtree(model_dir)
+                #
+                # Initialize the network each run:
+                #
+                net = lstm.ECGLSTM(5, 512, 5, 2).to(device)
+
+                #
+                # Train the classifier:
+                #
+                best_auc_scores = train_classifier(net, model_dir=model_dir, train_config=train_config)
+                best_auc_per_run.append(best_auc_scores[BEAT_TO_INDEX[beat_type]])
+                writer.add_scalar('best_auc_{}'.format(chk_name), best_auc_scores[BEAT_TO_INDEX[beat_type]], total_runs)
+                total_runs += 1
+            mean_auc = np.mean(best_auc_per_run)
+            max_auc = max(best_auc_per_run)
+            logging.info("Checkpoint {}: Mean AUC {}. Max AUC: {}".format(chk_name, mean_auc, max_auc))
+            mean_auc_values.append(mean_auc)
+            best_auc_values.append(max_auc)
+            final_dict[chk_name] = {}
+            final_dict[chk_name]['MEAN'] = mean_auc
+            final_dict[chk_name]['MAX'] = max_auc
+            writer.add_scalar('mean_auc_per_chk', mean_auc, i)
+            writer.add_scalar('max_auc_per_chk', max_auc, i)
+
+    writer.close()
+    #
+    # Save data in pickle:
+    #
+    pickle_file_path = base_tomer_remote + 'ecg_pytorch/ecg_pytorch/classifiers/pickles_results/{}_{}_lstm_different_ckps_500.pkl'.format(
+        beat_type, gan_type)
+    with open(pickle_file_path, 'wb') as handle:
+        pickle.dump(final_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 
 def train_with_noise():
@@ -353,8 +448,8 @@ def train_with_noise():
     with open('res_noise_{}.text'.format(beat_type), 'w') as fd:
         # for n in [500, 800, 1000, 1500, 3000, 5000, 7000, 10000, 15000]:
         for n in [0]:
-            base_niv_remote = '/home/nivgiladi/tomer/'
-            model_dir = base_niv_remote + 'ecg_pytorch/ecg_pytorch/classifiers/tensorboard/noise_{}/lstm_add_{}/'.format(
+            base_tomer_remote = '/home/nivgiladi/tomer/'
+            model_dir = base_tomer_remote + 'ecg_pytorch/ecg_pytorch/classifiers/tensorboard/noise_{}/lstm_add_{}/'.format(
                 str(n), beat_type)
 
             total_runs = 0
@@ -390,5 +485,8 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     beat_type = 'F'
     gan_type = 'ODE_GAN'
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
     train_mult(beat_type, gan_type, device)
+
+    # chk_dir = base_tomer_remote + 'ecg_pytorch/ecg_pytorch/gan_models/tensorboard/ecg_ode_gan_S_beat'
+    # find_optimal_checkpoint(chk_dir, beat_type, gan_type, device, 500)

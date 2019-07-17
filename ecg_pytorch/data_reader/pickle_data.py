@@ -3,6 +3,7 @@ import pickle
 niv_remote = '/home/nivgiladi/tomer/'
 local_base = '/Users/tomer.golany/PycharmProjects/'
 nlp_base = '/home/tomer.golany@st.technion.ac.il/'
+tomer_remote = '/home/tomer/tomer/'
 full_path = local_base + 'ecg_pytorch/ecg_pytorch/data_reader'
 # full_path = '/home/tomer.golany@st.technion.ac.il/ecg_pytorch/ecg_pytorch/data_reader'
 
