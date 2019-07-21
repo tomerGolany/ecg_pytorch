@@ -2,6 +2,7 @@ from ecg_pytorch.data_reader.ecg_dataset_lstm import EcgHearBeatsDataset, ToTens
 from matplotlib import pyplot as plt
 from torchvision import transforms
 from torch.utils.data import DataLoader
+import logging
 
 
 def TestEcgDatasetLSTM_1():
@@ -44,7 +45,6 @@ def test_iterate_with_dataloader():
             sample_batched['cardiac_cycle'], sample_batched['label']
         batch_size = len(ecg_batch)
 
-
         for i in range(batch_size):
             ax = plt.subplot(2, 2, i + 1)
             plt.tight_layout()
@@ -69,7 +69,7 @@ def test_iterate_with_dataloader():
             plt.figure()
             # show_landmarks_batch(sample_batched)
             # # plt.axis('off')
-            beat = ecg_lstm_batch[:,0, :]
+            beat = ecg_lstm_batch[:, 0, :]
             print(beat.shape)
             beat = beat.flatten()
             plt.plot(beat.numpy())
@@ -95,9 +95,24 @@ def test_one_vs_all():
             break
 
 
+def test_data_from_simulator():
+    dataset = EcgHearBeatsDataset()
+    sim_beats = dataset.add_beats_from_simulator(9, 'F')
+
+    #
+    # Debug: plot some beats:
+    #
+    print(sim_beats.shape)
+    single_beat = sim_beats[5]
+    plt.figure()
+    plt.plot(single_beat)
+    plt.show()
+
 
 if __name__ == "__main__":
     # TestEcgDatasetLSTM_1()
     # TestIteration()
-    test_iterate_with_dataloader()
+    # test_iterate_with_dataloader()
     # test_one_vs_all()
+    logging.basicConfig(level=logging.INFO)
+    test_data_from_simulator()

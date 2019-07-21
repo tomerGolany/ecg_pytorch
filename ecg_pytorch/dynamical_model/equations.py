@@ -1,7 +1,7 @@
 import torch
 import logging
 import math
-from ecg_pytorch.dynamical_model.ode_params import ODEParams
+from ecg_pytorch.dynamical_model.ode_params import ODEParams, ODEParamsNumpy
 import time
 from matplotlib import pyplot as plt
 import numpy as np
@@ -23,10 +23,42 @@ def d_x_d_t(y, x, t, rrpc, delta_t):
     return f_x
 
 
+def d_x_d_t_numpy(y, x, t, rrpc, delta_t):
+    alpha = 1 - ((x * x) + (y * y)) ** 0.5
+
+    cast = int(t / delta_t)
+    tensor_temp = 1 + cast
+    tensor_temp = tensor_temp % len(rrpc)
+    if rrpc[tensor_temp] == 0:
+        logging.info("***inside zero***")
+        omega = (2.0 * math.pi / 1e-3)
+    else:
+        omega = (2.0 * math.pi / rrpc[tensor_temp])
+
+    f_x = alpha * x - omega * y
+    return f_x
+
+
 def d_y_d_t(y, x, t, rrpc, delta_t):
     alpha = 1 - ((x * x) + (y * y)) ** 0.5
 
     cast = (t / delta_t).type(torch.IntTensor)
+    tensor_temp = 1 + cast
+    tensor_temp = tensor_temp % len(rrpc)
+    if rrpc[tensor_temp] == 0:
+        logging.info("***inside zero***")
+        omega = (2.0 * math.pi / 1e-3)
+    else:
+        omega = (2.0 * math.pi / rrpc[tensor_temp])
+
+    f_y = alpha * y + omega * x
+    return f_y
+
+
+def d_y_d_t_numpy(y, x, t, rrpc, delta_t):
+    alpha = 1 - ((x * x) + (y * y)) ** 0.5
+
+    cast = int(t / delta_t)
     tensor_temp = 1 + cast
     tensor_temp = tensor_temp % len(rrpc)
     if rrpc[tensor_temp] == 0:
@@ -114,6 +146,102 @@ def d_z_d_t(x, y, z, t, params, ode_params):
 
     f_z = -1 * (z_p + z_q + z_r + z_s + z_t) - (z - z_0_t)
     return f_z
+
+
+def d_z_d_t_numpy(x, y, z, t, params, ode_params):
+    A = ode_params.A
+    f2 = ode_params.f2
+    a_p, a_q, a_r, a_s, a_t = params[:, 0], params[:, 3], params[:, 6], params[:, 9], params[:, 12]
+
+    b_p, b_q, b_r, b_s, b_t = params[:, 1], params[:, 4], params[:, 7], params[:, 10], params[:, 13]
+
+    theta_p, theta_q, theta_r, theta_s, theta_t = params[:, 2], params[:, 5], params[:, 8], params[:, 11], params[:, 14]
+
+    a_p = a_p.reshape((-1, 1))
+    a_q = a_q.reshape((-1, 1))
+    a_r = a_r.reshape((-1, 1))
+    a_s = a_s.reshape((-1, 1))
+    a_t = a_t.reshape((-1, 1))
+
+    b_p = b_p.reshape((-1, 1))
+    b_q = b_q.reshape((-1, 1))
+    b_r = b_r.reshape((-1, 1))
+    b_s = b_s.reshape((-1, 1))
+    b_t = b_t.reshape((-1, 1))
+
+    theta_p = theta_p.reshape((-1, 1))
+    theta_q = theta_q.reshape((-1, 1))
+    theta_r = theta_r.reshape((-1, 1))
+    theta_s = theta_s.reshape((-1, 1))
+    theta_t = theta_t.reshape((-1, 1))
+
+    logging.debug("theta p shape: {}".format(theta_p.shape))
+    theta = np.arctan2(y, x)
+    logging.debug("theta shape: {}".format(theta.shape))
+    logging.debug("delta before mod: {}".format((theta - theta_p).shape))
+    delta_theta_p = np.fmod(theta - theta_p, 2 * math.pi)
+    logging.debug("delta theta shape: {}".format(delta_theta_p.shape))
+    delta_theta_q = np.fmod(theta - theta_q, 2 * math.pi)
+    delta_theta_r = np.fmod(theta - theta_r, 2 * math.pi)
+    delta_theta_s = np.fmod(theta - theta_s, 2 * math.pi)
+    delta_theta_t = np.fmod(theta - theta_t, 2 * math.pi)
+
+    z_p = a_p * delta_theta_p * \
+          np.exp((- delta_theta_p * delta_theta_p / (2 * b_p * b_p)))
+
+    z_q = a_q * delta_theta_q * \
+          np.exp((- delta_theta_q * delta_theta_q / (2 * b_q * b_q)))
+
+    z_r = a_r * delta_theta_r * \
+          np.exp((- delta_theta_r * delta_theta_r / (2 * b_r * b_r)))
+
+    z_s = a_s * delta_theta_s * \
+          np.exp((- delta_theta_s * delta_theta_s / (2 * b_s * b_s)))
+
+    z_t = a_t * delta_theta_t * \
+          np.exp((- delta_theta_t * delta_theta_t / (2 * b_t * b_t)))
+
+    z_0_t = (A * np.sin(2 * math.pi * f2 * t))
+
+    z_p = z_p
+    z_q = z_q
+    z_r = z_r
+    z_s = z_s
+    z_t = z_t
+    z_0_t = z_0_t
+
+    f_z = -1 * (z_p + z_q + z_r + z_s + z_t) - (z - z_0_t)
+    return f_z
+
+
+def generate_batch_of_beats_numpy(params):
+    ode_params = ODEParamsNumpy()
+    x = np.array([-0.417750770388669 for _ in range(params.shape[0])]).reshape((-1, 1))
+    y = np.array([-0.9085616622823985 for _ in range(params.shape[0])]).reshape((-1, 1))
+    z = np.array([-0.004551233843726818 for _ in range(params.shape[0])]).reshape((-1, 1))
+    t = 0.0
+
+    x_signal = [x]
+    y_signal = [y]
+    z_signal = [z]
+    start = time.time()
+    for i in range(215):
+        f_x = d_x_d_t_numpy(y, x, t, ode_params.rrpc, ode_params.h)
+        f_y = d_y_d_t_numpy(y, x, t, ode_params.rrpc, ode_params.h)
+        f_z = d_z_d_t_numpy(x, y, z, t, params, ode_params)
+
+        t += 1 / 512
+        x_signal.append(x + ode_params.h * f_x)
+        y_signal.append(y + ode_params.h * f_y)
+        z_signal.append(z + ode_params.h * f_z)
+
+        x = x + ode_params.h * f_x
+        y = y + ode_params.h * f_y
+        z = z + ode_params.h * f_z
+    end = time.time()
+    logging.info("Time to generate batch: {}".format(end - start))
+    z_signal = np.stack(z_signal).reshape((216, -1)).transpose()
+    return z_signal
 
 
 def test_equations():

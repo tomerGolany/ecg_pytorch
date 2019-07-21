@@ -2,6 +2,8 @@ from torch.utils.data import Dataset
 import numpy as np
 import torch
 from ecg_pytorch.data_reader import pickle_data
+from ecg_pytorch.dynamical_model import typical_beat_params, equations
+from matplotlib import pyplot as plt
 
 
 class EcgHearBeatsDataset(Dataset):
@@ -96,6 +98,19 @@ class EcgHearBeatsDataset(Dataset):
             self.additional_data_from_gan = output_g
             self.train = np.concatenate((self.train, output_g))
             print("Length of train samples after adding from generator is {}".format(len(self.train)))
+
+    def add_beats_from_simulator(self, num_beats_to_add, beat_type):
+        beat_params = typical_beat_params.beat_type_to_typical_param[beat_type]
+        noise_param = (np.random.normal(0, 0.1, (num_beats_to_add, 15)))
+        params = 0.01 * noise_param + beat_params
+        sim_beats = equations.generate_batch_of_beats_numpy(params)
+        sim_beats = np.array(
+            [{'cardiac_cycle': x, 'beat_type': beat_type, 'label': self.beat_type_to_one_hot_label[beat_type]} for x
+             in sim_beats])
+        self.additional_data_from_simulator = sim_beats
+        self.train = np.concatenate((self.train, sim_beats))
+        print("Length of train samples after adding from simulator is {}".format(len(self.train)))
+        return sim_beats
 
     def add_noise(self, n, beat_type):
         input_noise = np.random.normal(0, 1, (n, 216))

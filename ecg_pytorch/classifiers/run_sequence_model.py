@@ -20,8 +20,8 @@ import shutil
 from ecg_pytorch.gan_models import checkpoint_paths
 import pickle
 from ecg_pytorch import train_configs
-base_path = train_configs.base
 
+base_path = train_configs.base
 
 BEAT_TO_INDEX = {'N': 0, 'S': 1, 'V': 2, 'F': 3, 'Q': 4}
 
@@ -140,7 +140,18 @@ def train_classifier(net, model_dir, train_config=None):
     best_auc_scores = [0, 0, 0, 0]
 
     composed = transforms.Compose([ToTensor()])
-    dataset = EcgHearBeatsDataset(transform=composed)
+    if train_config.train_one_vs_all:
+        dataset = EcgHearBeatsDataset(transform=composed, beat_type=train_config.generator_details.beat_type,
+                                      one_vs_all=True)
+        testset = EcgHearBeatsDatasetTest(transform=composed, beat_type=train_config.generator_details.beat_type,
+                                          one_vs_all=True)
+    else:
+        dataset = EcgHearBeatsDataset(transform=composed)
+        testset = EcgHearBeatsDatasetTest(transform=composed)
+
+    testdataloader = torch.utils.data.DataLoader(testset, batch_size=300,
+                                                 shuffle=True, num_workers=1)
+
     num_examples_to_add = train_config.generator_details.num_examples_to_add
     generator_beat_type = train_config.generator_details.beat_type
     dataset.add_noise(num_examples_to_add, generator_beat_type)
@@ -159,16 +170,22 @@ def train_classifier(net, model_dir, train_config=None):
         logging.info("Size of training data before additional data from GAN: {}".format(len(dataset)))
         logging.info("#N: {}\t #S: {}\t #V: {}\t #F: {}\t".format(dataset.len_beat('N'), dataset.len_beat('S'),
                                                                   dataset.len_beat('V'), dataset.len_beat('F')))
-        if gan_type == 'DCGAN':
-            gNet = dcgan.DCGenerator(0)
-        elif gan_type == 'ODE_GAN':
-            gNet = ode_gan_aaai.DCGenerator(0)
-        else:
-            raise ValueError("Unknown gan type {}".format(gan_type))
+        if num_examples_to_add > 0:
+            if gan_type == 'DCGAN':
+                gNet = dcgan.DCGenerator(0)
+                dataset.add_beats_from_generator(gNet, num_examples_to_add,
+                                                 generator_checkpoint_path,
+                                                 generator_beat_type)
+            elif gan_type == 'ODE_GAN':
+                gNet = ode_gan_aaai.DCGenerator(0)
+                dataset.add_beats_from_generator(gNet, num_examples_to_add,
+                                                 generator_checkpoint_path,
+                                                 generator_beat_type)
+            elif gan_type == 'SIMULATOR':
+                dataset.add_beats_from_simulator(num_examples_to_add, generator_beat_type)
+            else:
+                raise ValueError("Unknown gan type {}".format(gan_type))
 
-        dataset.add_beats_from_generator(gNet, num_examples_to_add,
-                                         generator_checkpoint_path,
-                                         generator_beat_type)
         logging.info("Size of training data after additional data from GAN: {}".format(len(dataset)))
         logging.info("#N: {}\t #S: {}\t #V: {}\t #F: {}\t".format(dataset.len_beat('N'), dataset.len_beat('S'),
                                                                   dataset.len_beat('V'), dataset.len_beat('F')))
@@ -185,10 +202,6 @@ def train_classifier(net, model_dir, train_config=None):
     else:
         dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size,
                                                  num_workers=1, shuffle=True)
-
-    testset = EcgHearBeatsDatasetTest(transform=composed)
-    testdataloader = torch.utils.data.DataLoader(testset, batch_size=300,
-                                                 shuffle=True, num_workers=1)
 
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(net.parameters(), lr=lr)
@@ -227,10 +240,13 @@ def train_classifier(net, model_dir, train_config=None):
                                                                                                           loss.item(),
                                                                                                           accuracy.item()))
             if total_iters % 3000 == 0:
-                fig, _ = plot_confusion_matrix(labels_class.cpu().numpy(), outputs_class.cpu().numpy(),
-                                               np.array(['N', 'S', 'V', 'F', 'Q']))
-                # fig, _ = plot_confusion_matrix(labels_class.numpy(), outputs_class.numpy(),
-                #                                np.array(['N', 'Others']))
+                if train_config.train_one_vs_all:
+                    fig, _ = plot_confusion_matrix(labels_class.numpy(), outputs_class.numpy(),
+                                                   np.array([generator_beat_type, 'Others']))
+                else:
+                    fig, _ = plot_confusion_matrix(labels_class.cpu().numpy(), outputs_class.cpu().numpy(),
+                                                   np.array(['N', 'S', 'V', 'F', 'Q']))
+
                 writer.add_figure('train/confusion_matrix', fig, total_iters)
 
                 grad_norm = get_gradient_norm_l2(net)
@@ -239,14 +255,17 @@ def train_classifier(net, model_dir, train_config=None):
 
             if total_iters % 200 == 0:
                 with torch.no_grad():
-                    labels_total_one_hot = np.array([]).reshape((0, 5))
-                    outputs_preds = np.array([]).reshape((0, 5))
-                    # labels_total_one_hot = np.array([]).reshape((0, 2))
-                    # outputs_preds = np.array([]).reshape((0, 2))
+
+                    if train_config.train_one_vs_all:
+                        labels_total_one_hot = np.array([]).reshape((0, 2))
+                        outputs_preds = np.array([]).reshape((0, 2))
+                    else:
+                        labels_total_one_hot = np.array([]).reshape((0, 5))
+                        outputs_preds = np.array([]).reshape((0, 5))
+
                     labels_total = np.array([])
                     outputs_total = np.array([])
                     loss_hist = []
-                    start = time.time()
                     for _, test_data in enumerate(testdataloader):
                         ecg_batch = test_data['cardiac_cycle'].float().to(device)
                         labels = test_data['label'].to(device)
@@ -261,14 +280,17 @@ def train_classifier(net, model_dir, train_config=None):
                         labels_total = np.concatenate((labels_total, labels_class.cpu().numpy()))
                         outputs_total = np.concatenate((outputs_total, outputs_class.cpu().numpy()))
                         outputs_preds = np.concatenate((outputs_preds, outputs.cpu().numpy()))
-                    end = time.time()
-                    # print("Test evaluation took {:.2f} seconds".format(end - start))
+
                     outputs_total = outputs_total.astype(int)
                     labels_total = labels_total.astype(int)
-                    fig, _ = plot_confusion_matrix(labels_total, outputs_total,
-                                                   np.array(['N', 'S', 'V', 'F', 'Q']))
-                    # fig, _ = plot_confusion_matrix(labels_total, outputs_total,
-                    #                                np.array(['N', 'Other']))
+
+                    if train_config.train_one_vs_all:
+                        fig, _ = plot_confusion_matrix(labels_total, outputs_total,
+                                                       np.array([generator_beat_type, 'Other']))
+                    else:
+                        fig, _ = plot_confusion_matrix(labels_total, outputs_total,
+                                                       np.array(['N', 'S', 'V', 'F', 'Q']))
+
                     # Accuracy and Loss:
                     accuracy = sum((outputs_total == labels_total)) / len(outputs_total)
                     writer.add_scalars('accuracy', {'Test set accuracy': accuracy}, global_step=total_iters)
@@ -279,12 +301,23 @@ def train_classifier(net, model_dir, train_config=None):
                     #
                     # Check AUC values:
                     #
-                    auc_roc = plt_roc_curve(labels_total_one_hot, outputs_preds, np.array(['N', 'S', 'V', 'F', 'Q']),
-                                            writer,
-                                            total_iters)
-                    for i_auc in range(4):
-                        if auc_roc[i_auc] > best_auc_scores[i_auc]:
-                            best_auc_scores[i_auc] = auc_roc[i_auc]
+                    if train_config.train_one_vs_all:
+                        auc_roc = plt_roc_curve(labels_total_one_hot, outputs_preds,
+                                                np.array([generator_beat_type, 'Other']),
+                                                writer,
+                                                total_iters)
+                        for i_auc in range(2):
+                            if auc_roc[i_auc] > best_auc_scores[i_auc]:
+                                best_auc_scores[i_auc] = auc_roc[i_auc]
+
+                    else:
+                        auc_roc = plt_roc_curve(labels_total_one_hot, outputs_preds,
+                                                np.array(['N', 'S', 'V', 'F', 'Q']),
+                                                writer,
+                                                total_iters)
+                        for i_auc in range(4):
+                            if auc_roc[i_auc] > best_auc_scores[i_auc]:
+                                best_auc_scores[i_auc] = auc_roc[i_auc]
     writer.close()
     return best_auc_scores
 
@@ -299,14 +332,16 @@ def get_gradient_norm_l2(model):
 
 
 def train_mult(beat_type, gan_type, device):
-
     summary_model_dir = base_path + 'ecg_pytorch/ecg_pytorch/classifiers/tensorboard/{}/lstm_{}_summary/'.format(
-            beat_type, gan_type)
+        beat_type, gan_type)
     writer = SummaryWriter(summary_model_dir)
     #
     # Retrieve Checkpoint path:
     #
-    ck_path = checkpoint_paths.BEAT_AND_MODEL_TO_CHECKPOINT_PATH[beat_type][gan_type]
+    if gan_type in ['DCGAN', 'ODE_GAN']:
+        ck_path = checkpoint_paths.BEAT_AND_MODEL_TO_CHECKPOINT_PATH[beat_type][gan_type]
+    else:
+        ck_path = None
 
     #
     # Define summary values:
@@ -320,6 +355,7 @@ def train_mult(beat_type, gan_type, device):
     # Run with different number of additional data from trained generator:
     #
     for n in [500, 800, 1000, 1500, 3000, 5000, 7000, 10000, 15000]:
+        # for n in [5000]:
         #
         # Train configurations:
         #
@@ -329,7 +365,8 @@ def train_mult(beat_type, gan_type, device):
                                                     num_examples_to_add=n, gan_type=gan_type)
         train_config = ECGTrainConfig(num_epochs=5, batch_size=20, lr=0.0002, weighted_loss=False,
                                       weighted_sampling=True,
-                                      device=device, add_data_from_gan=True, generator_details=gen_details)
+                                      device=device, add_data_from_gan=True, generator_details=gen_details,
+                                      train_one_vs_all=False)
         #
         # Run 10 times each configuration:
         #
@@ -351,6 +388,9 @@ def train_mult(beat_type, gan_type, device):
             best_auc_per_run.append(best_auc_scores[BEAT_TO_INDEX[beat_type]])
             writer.add_scalar('auc_with_additional_{}_beats'.format(n), best_auc_scores[BEAT_TO_INDEX[beat_type]],
                               total_runs)
+            if best_auc_scores[BEAT_TO_INDEX[beat_type]] >= 0.88:
+                logging.info("Found desired AUC: {}".format(best_auc_scores))
+                break
             total_runs += 1
         best_auc_for_each_n[n] = best_auc_per_run
         mean_auc_values.append(np.mean(best_auc_per_run))
@@ -371,7 +411,7 @@ def train_mult(beat_type, gan_type, device):
 
 
 def find_optimal_checkpoint(chk_dir, beat_type, gan_type, device, num_samples_to_add):
-    model_dir = base_path + 'ecg_pytorch/ecg_pytorch/classifiers/tensorboard/{}/find_optimal_chk_{}_{}_agg/'\
+    model_dir = base_path + 'ecg_pytorch/ecg_pytorch/classifiers/tensorboard/{}/find_optimal_chk_{}_{}_agg/' \
         .format(beat_type, str(num_samples_to_add), gan_type)
 
     writer = SummaryWriter(model_dir)
@@ -397,7 +437,8 @@ def find_optimal_checkpoint(chk_dir, beat_type, gan_type, device, num_samples_to
                                                         num_examples_to_add=num_samples_to_add, gan_type=gan_type)
             train_config = ECGTrainConfig(num_epochs=5, batch_size=20, lr=0.0002, weighted_loss=False,
                                           weighted_sampling=True,
-                                          device=device, add_data_from_gan=True, generator_details=gen_details)
+                                          device=device, add_data_from_gan=True, generator_details=gen_details,
+                                          train_one_vs_all=False)
             #
             # Run 10 times each configuration:
             #
@@ -466,7 +507,8 @@ def train_with_noise():
                                                             num_examples_to_add=n)
                 train_config = ECGTrainConfig(num_epochs=4, batch_size=16, lr=0.002, weighted_loss=False,
                                               weighted_sampling=True,
-                                              device=device, add_data_from_gan=False, generator_details=gen_details)
+                                              device=device, add_data_from_gan=False, generator_details=gen_details,
+                                              train_one_vs_all=False)
                 train_classifier(net, model_dir=model_dir, train_config=train_config)
                 total_runs += 1
             logging.info("Done after {} runs.".format(total_runs))
@@ -481,8 +523,9 @@ def train_with_noise():
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    beat_type = 'F'
-    gan_type = 'ODE_GAN'
+    beat_type = 'N'
+    # gan_type = 'ODE_GAN'
+    gan_type = 'SIMULATOR'
     device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
     train_mult(beat_type, gan_type, device)
 
