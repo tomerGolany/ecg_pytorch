@@ -238,7 +238,7 @@ def create_V_sample():
     beats = ecg_data.test
     n = 1  # for 2 random indices
     index = np.random.choice(len(beats), n, replace=False)
-    index = [2439]
+    # index = [2439]
     print(index)
     random_s_beats = beats[index]
 
@@ -247,9 +247,14 @@ def create_V_sample():
     #
     ode_params = ODEParams('cpu')
     ode_params.h = torch.tensor(1 / 216).to('cpu')
-    params = [0.1, 0.6, -0.5 * math.pi, 0.0, 0.1, -15.0 * math.pi / 180.0,
-              30.0, 0.1, 0.00 * math.pi / 180.0, -10.0, 0.1, 15.0 * math.pi / 180.0, 0.5, 0.2,
-              160.0 * math.pi / 180.0]
+    #params = [1.2, 0.25, -60.0 * math.pi / 180.0, -5.0, 0.1, -15.0 * math.pi / 180.0,
+    #                  30.0, 0.1, 0.0 * math.pi / 180.0, -7.5, 0.1, 15.0 * math.pi / 180.0, 0.75, 0.4,
+    #                  90.0 * math.pi / 180.0]
+    params = [0.1, 0.6, -0.5 * math.pi,
+              0.0, 0.1, -15.0 * math.pi / 180.0,
+               30.0, 0.1, 0.00 * math.pi / 180.0,
+              -10.0, 0.1, 15.0 * math.pi / 180.0,
+              0.5, 0.2, 160.0 * math.pi / 180.0]
 
     input_params = torch.tensor(params).view(1, 15)
     x = torch.tensor(-0.417750770388669)
@@ -292,8 +297,8 @@ def create_V_sample():
 
 
 if __name__ == "__main__":
-    create_good_sample()
+    # create_good_sample()
     # create_sample()
     # create_S_sample()
     # create_F_sample()
-    # create_V_sample()
+    create_V_sample()

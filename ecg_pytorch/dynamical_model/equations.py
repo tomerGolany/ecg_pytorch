@@ -82,7 +82,8 @@ def d_z_d_t(x, y, z, t, params, ode_params):
     :param ode_params: Nx15
     :return:
     """
-    device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda:6" if torch.cuda.is_available() else "cpu")
+    # device = 'cpu'
     A = ode_params.A
     f2 = ode_params.f2
     a_p, a_q, a_r, a_s, a_t = params[:, 0], params[:, 3], params[:, 6], params[:, 9], params[:, 12]

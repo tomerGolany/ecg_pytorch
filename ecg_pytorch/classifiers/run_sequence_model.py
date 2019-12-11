@@ -12,6 +12,7 @@ from sklearn.metrics import confusion_matrix
 from ecg_pytorch.classifiers.models import lstm
 from ecg_pytorch.train_configs import ECGTrainConfig, GeneratorAdditionalDataConfig
 from ecg_pytorch.gan_models.models import dcgan
+from ecg_pytorch.gan_models.models import vanila_gan
 import logging
 import time
 import os
@@ -36,6 +37,7 @@ def init_weights(m):
 def plt_roc_curve(y_true, y_pred, classes, writer, total_iters):
     """
 
+    In one Vs. All setting: positive class is -> [1,0] and negative is [0,1]
     :param y_true:[[1,0,0,0,0], [0,1,0,0], [1,0,0,0,0],...]
     :param y_pred: [0.34,0.2,0.1] , 0.2,...]
     :param classes:5
@@ -86,6 +88,7 @@ def plot_confusion_matrix(y_true, y_pred, classes,
     cm = confusion_matrix(y_true, y_pred)
     # Only use the labels that appear in the data
     classes = classes[unique_labels(y_true, y_pred)]
+    normalize = True
     if normalize:
         cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
         # print("Normalized confusion matrix")
@@ -142,9 +145,10 @@ def train_classifier(net, model_dir, train_config=None):
     composed = transforms.Compose([ToTensor()])
     if train_config.train_one_vs_all:
         dataset = EcgHearBeatsDataset(transform=composed, beat_type=train_config.generator_details.beat_type,
-                                      one_vs_all=True)
+                                      one_vs_all=True, lstm_setting=False)
         testset = EcgHearBeatsDatasetTest(transform=composed, beat_type=train_config.generator_details.beat_type,
-                                          one_vs_all=True)
+                                          one_vs_all=True, lstm_setting=False)
+        best_auc_scores = [0, 0]
     else:
         dataset = EcgHearBeatsDataset(transform=composed)
         testset = EcgHearBeatsDatasetTest(transform=composed)
@@ -152,9 +156,9 @@ def train_classifier(net, model_dir, train_config=None):
     testdataloader = torch.utils.data.DataLoader(testset, batch_size=300,
                                                  shuffle=True, num_workers=1)
 
-    num_examples_to_add = train_config.generator_details.num_examples_to_add
-    generator_beat_type = train_config.generator_details.beat_type
-    dataset.add_noise(num_examples_to_add, generator_beat_type)
+    # num_examples_to_add = train_config.generator_details.num_examples_to_add
+    # generator_beat_type = train_config.generator_details.beat_type
+    # dataset.add_noise(num_examples_to_add, generator_beat_type)
 
     #
     # Check if to add data from GAN:
@@ -183,6 +187,22 @@ def train_classifier(net, model_dir, train_config=None):
                                                  generator_beat_type)
             elif gan_type == 'SIMULATOR':
                 dataset.add_beats_from_simulator(num_examples_to_add, generator_beat_type)
+
+            elif gan_type == 'VANILA_GAN':
+                gNet = vanila_gan.VGenerator(0)
+                dataset.add_beats_from_generator(gNet, num_examples_to_add,
+                                                 generator_checkpoint_path,
+                                                 generator_beat_type)
+
+            elif gan_type == 'VANILA_GAN_ODE':
+                gNet = vanila_gan.VGenerator(0)
+                dataset.add_beats_from_generator(gNet, num_examples_to_add,
+                                                 generator_checkpoint_path,
+                                                 generator_beat_type)
+
+            elif gan_type == 'NOISE':
+                dataset.add_noise(num_examples_to_add, generator_beat_type)
+
             else:
                 raise ValueError("Unknown gan type {}".format(gan_type))
 
@@ -215,14 +235,19 @@ def train_classifier(net, model_dir, train_config=None):
             ecg_batch = data['cardiac_cycle'].float().to(device)
             b_size = ecg_batch.shape[0]
             labels = data['label'].to(device)
+
+
             labels_class = torch.max(labels, 1)[1]
+
             labels_str = data['beat_type']
             logging.debug("batch labels: {}".format(labels_str))
+
             # zero the parameter gradients
             net.zero_grad()
 
             # forward + backward + optimize
             outputs = net(ecg_batch)
+
             outputs_class = torch.max(outputs, 1)[1]
             accuracy = (outputs_class == labels_class).sum().float() / b_size
             loss = criterion(outputs, torch.max(labels, 1)[1])
@@ -234,14 +259,14 @@ def train_classifier(net, model_dir, train_config=None):
             #
             # print statistics
             #
-            if total_iters % 1000 == 0:
-                logging.info("Epoch {}. Iteration {}/{}.\t Batch loss = {:.2f}. Accuracy = {:.2f}".format(epoch + 1, i,
+            if total_iters % 10 == 0:
+                logging.info("Epoch {}. Iteration {}/{}.\t Batch train loss = {:.2f}. Accuracy batch train = {:.2f}".format(epoch + 1, i,
                                                                                                           num_iters_per_epoch,
                                                                                                           loss.item(),
                                                                                                           accuracy.item()))
-            if total_iters % 3000 == 0:
+            if total_iters % 300 == 0:
                 if train_config.train_one_vs_all:
-                    fig, _ = plot_confusion_matrix(labels_class.numpy(), outputs_class.numpy(),
+                    fig, _ = plot_confusion_matrix(labels_class.cpu().numpy(), outputs_class.cpu().numpy(),
                                                    np.array([generator_beat_type, 'Others']))
                 else:
                     fig, _ = plot_confusion_matrix(labels_class.cpu().numpy(), outputs_class.cpu().numpy(),
@@ -269,9 +294,11 @@ def train_classifier(net, model_dir, train_config=None):
                     for _, test_data in enumerate(testdataloader):
                         ecg_batch = test_data['cardiac_cycle'].float().to(device)
                         labels = test_data['label'].to(device)
+                        # logging.info("label positive: ", labels.cpu().nunpy())
 
                         labels_class = torch.max(labels, 1)[1]
                         outputs = net(ecg_batch)
+                        # print(outputs.cpu().numpy().shape)
                         loss = criterion(outputs, torch.max(labels, 1)[1])
                         loss_hist.append(loss.item())
                         outputs_class = torch.max(outputs, 1)[1]
@@ -524,10 +551,18 @@ def train_with_noise():
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     beat_type = 'N'
-    # gan_type = 'ODE_GAN'
-    gan_type = 'SIMULATOR'
+    gan_type = 'ODE_GAN'
+    # gan_type = 'SIMULATOR'
     device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
-    train_mult(beat_type, gan_type, device)
+    # train_mult(beat_type, gan_type, device)
 
     # chk_dir = base_tomer_remote + 'ecg_pytorch/ecg_pytorch/gan_models/tensorboard/ecg_ode_gan_S_beat'
     # find_optimal_checkpoint(chk_dir, beat_type, gan_type, device, 500)
+
+    model_dir = base_path + 'ecg_pytorch/ecg_pytorch/classifiers/tensorboard/multi_class_lstm_1'
+    net = lstm.ECGLSTM(5, 512, 5, 2).to(device)
+    train_config = ECGTrainConfig(num_epochs=5, batch_size=20, lr=0.0002, weighted_loss=False,
+                                  weighted_sampling=True,
+                                  device=device, add_data_from_gan=False, generator_details=None,
+                                  train_one_vs_all=False)
+    train_classifier(net, model_dir, train_config=train_config)

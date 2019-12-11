@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 from ecg_pytorch.data_reader import ecg_dataset
 from tensorboardX import SummaryWriter
 from ecg_pytorch.gan_models.models import dcgan
+from ecg_pytorch.gan_models.models import vanila_gan
 
 
 # custom weights initialization called on netG and netD
@@ -28,7 +29,7 @@ def train_ecg_gan(batch_size, num_train_steps, generator, discriminator, model_d
     # 1. create the ECG dataset:
     # composed = transforms.Compose([ecg_dataset.Scale(), ecg_dataset.Smooth(), ecg_dataset.ToTensor()])
     composed = transforms.Compose([ecg_dataset.ToTensor()])
-    dataset = ecg_dataset.EcgHearBeatsDataset(transform=composed, beat_type='N')
+    dataset = ecg_dataset.EcgHearBeatsDataset(transform=composed, beat_type='F')
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size,
                                              shuffle=True, num_workers=1)
     print("Size of real dataset is {}".format(len(dataset)))
@@ -37,8 +38,8 @@ def train_ecg_gan(batch_size, num_train_steps, generator, discriminator, model_d
     netG = generator
     netD = discriminator
     # This is only for the combined generator:
-    ode_g = generator.ode_generator
-    z_delta_g = generator.z_delta_generator
+    # ode_g = generator.ode_generator
+    # z_delta_g = generator.z_delta_generator
 
     # Loss functions:
     cross_entropy_loss = nn.BCELoss()
@@ -73,7 +74,7 @@ def train_ecg_gan(batch_size, num_train_steps, generator, discriminator, model_d
             ecg_batch = data['cardiac_cycle'].float()
             b_size = ecg_batch.shape[0]
 
-            v0 = ecg_batch[:, 0]  # For ODE solver initial step.
+            # v0 = ecg_batch[:, 0]  # For ODE solver initial step.
 
             num_of_beats_seen += ecg_batch.shape[0]
             output = netD(ecg_batch)
@@ -89,8 +90,8 @@ def train_ecg_gan(batch_size, num_train_steps, generator, discriminator, model_d
             mean_d_real_output = output.mean().item()
             d_real_pred_hist.append(mean_d_real_output)
             noise_input = torch.Tensor(np.random.normal(0, 1, (b_size, 100)))
-            # output_g_fake = netG(noise_input)
-            output_g_fake = netG(noise_input, v0)
+            output_g_fake = netG(noise_input)
+            # output_g_fake = netG(noise_input, v0)
             output = netD(output_g_fake.detach())
             labels.fill_(0)
 
@@ -146,50 +147,50 @@ def train_ecg_gan(batch_size, num_train_steps, generator, discriminator, model_d
 
             if iters % 25 == 0:
                 with torch.no_grad():
-                    with torch.no_grad():
-                        output_g = netG(val_noise, v0)
-                        output_g_ode = ode_g(val_noise, v0)
-                        output_z_delta = z_delta_g(val_noise)
-                        # output_g = netG(val_noise)
-                        fig = plt.figure()
-                        plt.title("Fake beats from Generator. iteration {}".format(i))
-                        for p in range(4):
-                            plt.subplot(2, 2, p + 1)
-                            plt.plot(output_g[p].detach().numpy(), label="fake beat")
-                            plt.plot(ecg_batch[p].detach().numpy(), label="real beat")
-                            plt.legend()
-                        writer.add_figure('Generator/output_example', fig, iters)
-                        plt.close()
+                    # with torch.no_grad():
+                    #     #output_g = netG(val_noise, v0)
+                    #     #output_g_ode = ode_g(val_noise, v0)
+                    #     #output_z_delta = z_delta_g(val_noise)
+                    #     output_g = netG(val_noise)
+                    #     fig = plt.figure()
+                    #     plt.title("Fake beats from Generator. iteration {}".format(i))
+                    #     for p in range(4):
+                    #         plt.subplot(2, 2, p + 1)
+                    #         plt.plot(output_g[p].detach().numpy(), label="fake beat")
+                    #         plt.plot(ecg_batch[p].detach().numpy(), label="real beat")
+                    #         plt.legend()
+                    #     writer.add_figure('Generator/output_example', fig, iters)
+                    #     plt.close()
 
-                        fig = plt.figure()
-                        plt.title("Fake beats from ode Generator only. iteration {}".format(i))
-                        for p in range(4):
-                            plt.subplot(2, 2, p + 1)
-                            plt.plot(output_g_ode[p].detach().numpy(), label="fake beat")
-                            plt.plot(ecg_batch[p].detach().numpy(), label="real beat")
-                            plt.legend()
-                        writer.add_figure('Generator/ode_g_output', fig, iters)
-                        plt.close()
-
-                        fig = plt.figure()
-                        plt.title("Fake beats from z_delta Generator only. iteration {}".format(i))
-                        for p in range(4):
-                            plt.subplot(2, 2, p + 1)
-                            plt.plot(output_z_delta[p].detach().numpy(), label="fake beat")
-                            plt.plot(ecg_batch[p].detach().numpy(), label="real beat")
-                            plt.legend()
-                        writer.add_figure('Generator/z_delta_g_output', fig, iters)
-                        plt.close()
-                    # output_g = netG(val_noise)
-                    # fig = plt.figure()
-                    # plt.title("Fake beats from Generator. iteration {}".format(i))
-                    # for p in range(4):
-                    #     plt.subplot(2, 2, p + 1)
-                    #     plt.plot(output_g[p].detach().numpy(), label="fake beat")
-                    #     plt.plot(ecg_batch[p].detach().numpy(), label="real beat")
-                    #     plt.legend()
-                    # writer.add_figure('Generator/output_example', fig, iters)
-                    # plt.close()
+                        # fig = plt.figure()
+                        # plt.title("Fake beats from ode Generator only. iteration {}".format(i))
+                        # for p in range(4):
+                        #     plt.subplot(2, 2, p + 1)
+                        #     plt.plot(output_g_ode[p].detach().numpy(), label="fake beat")
+                        #     plt.plot(ecg_batch[p].detach().numpy(), label="real beat")
+                        #     plt.legend()
+                        # writer.add_figure('Generator/ode_g_output', fig, iters)
+                        # plt.close()
+                        #
+                        # fig = plt.figure()
+                        # plt.title("Fake beats from z_delta Generator only. iteration {}".format(i))
+                        # for p in range(4):
+                        #     plt.subplot(2, 2, p + 1)
+                        #     plt.plot(output_z_delta[p].detach().numpy(), label="fake beat")
+                        #     plt.plot(ecg_batch[p].detach().numpy(), label="real beat")
+                        #     plt.legend()
+                        # writer.add_figure('Generator/z_delta_g_output', fig, iters)
+                        # plt.close()
+                    output_g = netG(val_noise)
+                    fig = plt.figure()
+                    plt.title("Fake beats from Generator. iteration {}".format(i))
+                    for p in range(4):
+                        plt.subplot(2, 2, p + 1)
+                        plt.plot(output_g[p].detach().numpy(), label="fake beat")
+                        plt.plot(ecg_batch[p].detach().numpy(), label="real beat")
+                        plt.legend()
+                    writer.add_figure('Generator/output_example', fig, iters)
+                    plt.close()
             if iters % 200 == 0:
                 torch.save({
                     'epoch': epoch,
@@ -217,10 +218,12 @@ def get_gradient_norm_l2(model):
 if __name__ == "__main__":
     # netG = Generator(0, "cpu")
     # netG = DeltaGenerator(0)
-    netG = dcgan.DCGenerator(0)
-    netG.apply(weights_init)
+    netG = vanila_gan.VGenerator(0)
+    # netG = dcgan.DCGenerator(0)
+    # netG.apply(weights_init)
     # netD = Discriminator(0)
-    netD = dcgan.DCDiscriminator(0)
-    netD.apply(weights_init)
-    model_dir = 'tensorboard/ecg_ode_gan_N_beat'
+    # netD = dcgan.DCDiscriminator(0)
+    # netD.apply(weights_init)
+    netD = vanila_gan.VDiscriminator(0)
+    model_dir = 'tensorboard/ecg_vanilla_gan_F_beat'
     train_ecg_gan(50, 2000, netG, netD, model_dir)

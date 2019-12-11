@@ -7,7 +7,7 @@ class FF(nn.Module):
         super(FF, self).__init__()
         self.fc1 = nn.Linear(216, 100)
         self.fc2 = nn.Linear(100, 50)
-        self.fc3 = nn.Linear(50, 5)
+        self.fc3 = nn.Linear(50, 2)
 
     def forward(self, x):
         x = F.relu(self.fc1(x))

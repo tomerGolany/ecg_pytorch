@@ -22,6 +22,17 @@ def compare_real_vs_fake(beat_type, real_beat, fake_beat):
     # put the results in a row
     show(row(s1, s2))
 
+
+def visualize_real_beat(beat_type):
+    time = list(range(216))
+    dataset = ecg_dataset.EcgHearBeatsDataset(beat_type=beat_type)
+    real_n_beat = dataset.train[200]['cardiac_cycle']
+
+    p = figure(x_axis_label='Sample number (360 Hz)', y_axis_label='Voltage[mV]')
+    p.line(time,real_n_beat, line_width=2, line_color="green")
+    output_file("N_{}_real.html".format(200))
+    show(p)
+
 #
 # DCGAN:
 #
@@ -29,13 +40,14 @@ def compare_real_vs_fake(beat_type, real_beat, fake_beat):
 #
 # Visualize fake N beat against real N beat:
 #
-gNET = dcgan.DCGenerator(0)
-fake_n_beat = generate_data_from_train_gan.generate_data_from_trained_gan(gNET, 1, checkpoint_paths.DCGAN_N_CHK)
-fake_n_beat = fake_n_beat.numpy()[0]
-dataset = ecg_dataset.EcgHearBeatsDataset(beat_type='N')
-real_n_beat = dataset.train[200]['cardiac_cycle']
-compare_real_vs_fake('N', real_n_beat, fake_n_beat)
+# gNET = dcgan.DCGenerator(0)
+# fake_n_beat = generate_data_from_train_gan.generate_data_from_trained_gan(gNET, 1, checkpoint_paths.DCGAN_N_CHK)
+# fake_n_beat = fake_n_beat.numpy()[0]
+# dataset = ecg_dataset.EcgHearBeatsDataset(beat_type='N')
+# real_n_beat = dataset.train[200]['cardiac_cycle']
+# compare_real_vs_fake('N', real_n_beat, fake_n_beat)
 
 
-
+beat_type = 'N'
+visualize_real_beat(beat_type)
 

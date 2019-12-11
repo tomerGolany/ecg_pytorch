@@ -9,12 +9,13 @@ from matplotlib import pyplot as plt
 class EcgHearBeatsDataset(Dataset):
     """ECG heart beats dataset."""
 
-    def __init__(self, transform=None, beat_type=None, one_vs_all=None):
+    def __init__(self, transform=None, beat_type=None, one_vs_all=None, lstm_setting=True):
         """
         [45443, 884, 3536, 414, 8]
         :param transform:
         :param beat_type:
         """
+        self.lstm_setting = lstm_setting
         self.train, self.val, _ = pickle_data.load_ecg_input_from_pickle()
         self.one_vs_all = False
         self.train = np.concatenate((self.train, self.val), axis=0)
@@ -69,7 +70,11 @@ class EcgHearBeatsDataset(Dataset):
 
     def __getitem__(self, idx):
         sample = self.train[idx]
-        lstm_beat = np.array([sample['cardiac_cycle'][i:i + 5] for i in range(0, 215, 5)])
+
+        if self.lstm_setting:
+            lstm_beat = np.array([sample['cardiac_cycle'][i:i + 5] for i in range(0, 215, 5)])
+        else:
+            lstm_beat = sample['cardiac_cycle']
         tag = sample['beat_type']
         if not self.one_vs_all:
             sample = {'cardiac_cycle': lstm_beat, 'beat_type': tag, 'label': np.array(sample['label'])}
@@ -124,8 +129,9 @@ class EcgHearBeatsDataset(Dataset):
 class EcgHearBeatsDatasetTest(Dataset):
     """ECG heart beats dataset."""
 
-    def __init__(self, transform=None, beat_type=None, one_vs_all=None):
+    def __init__(self, transform=None, beat_type=None, one_vs_all=None, lstm_setting=True):
         _, _, self.test = pickle_data.load_ecg_input_from_pickle()
+        self.lstm_setting = lstm_setting
         self.one_vs_all = False
         if beat_type is not None and one_vs_all is None:
             self.test = np.array([sample for sample in self.test if sample['beat_type'] == beat_type])
@@ -143,7 +149,11 @@ class EcgHearBeatsDatasetTest(Dataset):
 
     def __getitem__(self, idx):
         sample = self.test[idx]
-        lstm_beat = np.array([sample['cardiac_cycle'][i:i + 5] for i in range(0, 215, 5)])  # [43, 5]
+
+        if self.lstm_setting:
+            lstm_beat = np.array([sample['cardiac_cycle'][i:i + 5] for i in range(0, 215, 5)])  # [43, 5]
+        else:
+            lstm_beat = sample['cardiac_cycle']
         tag = sample['beat_type']
         # sample = {'cardiac_cycle': lstm_beat, 'beat_type': tag, 'label': np.array(sample['label'])}
         if not self.one_vs_all:

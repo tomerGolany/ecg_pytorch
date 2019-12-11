@@ -15,6 +15,9 @@ import math
 import logging
 import pickle
 from ecg_pytorch.dynamical_model import typical_beat_params
+from ecg_pytorch.gan_models.models import vanila_gan
+from bokeh.plotting import figure, output_file, show, save
+from ecg_pytorch.data_reader import smooth_signal
 
 TYPICAL_ODE_N_PARAMS = [0.7, 0.25, -0.5 * math.pi, -7.0, 0.1, -15.0 * math.pi / 180.0,
                       30.0, 0.1, 0.0 * math.pi / 180.0, -3.0, 0.1, 15.0 * math.pi / 180.0, 0.2, 0.4,
@@ -49,6 +52,11 @@ def generate_typical_F_ode_params(b_size, device):
     params = 0.1 * noise_param + torch.Tensor(typical_beat_params.TYPICAL_ODE_F_PARAMS).to(device)
     return params
 
+def generate_typical_V_ode_params(b_size, device):
+    noise_param = torch.Tensor(np.random.normal(0, 0.1, (b_size, 15))).to(device)
+    params = 0.1 * noise_param + torch.Tensor(typical_beat_params.TYPICAL_ODE_V_PARAMS).to(device)
+    return params
+
 
 def ode_loss(hb_batch, ode_params, device, beat_type):
     """
@@ -57,6 +65,7 @@ def ode_loss(hb_batch, ode_params, device, beat_type):
     :return:
     """
     # print(hb_batch[:, 0])
+    #
     # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     delta_t = ode_params.h
     # params_one = [1.2, 0.25, -60.0 * math.pi / 180.0, -5.0, 0.1, -15.0 * math.pi / 180.0,
@@ -75,6 +84,8 @@ def ode_loss(hb_batch, ode_params, device, beat_type):
         params_batch = generate_typical_S_ode_params(batch_size, device)
     elif beat_type == 'F':
         params_batch = generate_typical_F_ode_params(batch_size, device)
+    elif beat_type == 'V':
+        params_batch = generate_typical_V_ode_params(batch_size, device)
     else:
         raise NotImplementedError()
 
@@ -193,7 +204,8 @@ def euler_loss(hb_batch, params_batch, x_batch, y_batch, ode_params):
 
 def train(batch_size, num_train_steps, model_dir, beat_type):
 
-    device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda:6" if torch.cuda.is_available() else "cpu")
+    # device = 'cpu'
     ode_params = ODEParams(device)
 
     #
@@ -212,11 +224,13 @@ def train(batch_size, num_train_steps, model_dir, beat_type):
 
     #
     # 2. Create the models:
-    #
+
     netG = ode_gan_aaai.DCGenerator(0).to(device)
     netD = ode_gan_aaai.DCDiscriminator(0).to(device)
     netD.apply(weights_init)
     netG.apply(weights_init)
+    # netG = vanila_gan.VGenerator(0).to(device)
+    # netD = vanila_gan.VDiscriminator(0).to(device)
 
     #
     # Define loss functions:
@@ -351,7 +365,19 @@ def train(batch_size, num_train_steps, model_dir, beat_type):
                         writer.add_figure('Generator/output_example', fig, iters)
                         plt.close()
 
-            if iters % 200 == 0:
+                    #
+                    # Add bokeh plot:
+                    #
+                    p = figure(x_axis_label='Sample number (360 Hz)', y_axis_label='Voltage[mV]')
+                    time = np.arange(0, 216)
+                    fake_beat = output_g[0].cpu().detach().numpy()
+                    w = 'hanning'
+                    smoothed_beat = smooth_signal.smooth(fake_beat, 10, w)
+                    p.line(time, smoothed_beat, line_width=2, line_color="blue")
+                    output_file("N_{}_ODE.html".format(iters))
+                    save(p)
+
+            if iters % 50 == 0:
                 torch.save({
                     'epoch': epoch,
                     'generator_state_dict': netG.state_dict(),
@@ -379,6 +405,6 @@ def get_gradient_norm_l2(model):
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    model_dir = 'tensorboard/ecg_ode_gan_F_beat/'
-    beat_type = 'F'
+    model_dir = 'tensorboard/ecg_ode_gan_N_beat/'
+    beat_type = 'N'
     train(150, 5000, model_dir, beat_type)

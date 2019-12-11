@@ -1,6 +1,10 @@
 import numpy as np
 import os
 import logging
+from matplotlib import pyplot as plt
+from bokeh.io import output_file, show
+from bokeh.layouts import row
+from bokeh.plotting import figure
 DATA_DIR = '/Users/tomer.golany/PycharmProjects/ecg_dl/ecg_dl/Data/text_files/'
 
 train_set = [101, 106, 108, 109, 112, 114, 115, 116, 118, 119, 122, 124, 201, 203, 205, 207, 208, 209, 215, 220,
@@ -130,5 +134,16 @@ def beats_from_patient(patient_number):
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    p_100 = beats_from_patient('100')
+    p_100 = beats_from_patient('101')
     print(len(p_100))
+
+    time = list(range(216))
+
+    N_b = [x['cardiac_cycle'] for x in p_100 if x['beat_type'] == 'N']
+    for i in range(100):
+        p = figure(x_axis_label='Sample number (360 Hz)', y_axis_label='Voltage[mV]')
+        p.line(time, N_b[i], line_width=2, line_color="green")
+        output_file("N_{}_real.html".format(i))
+        show(p)
+        # plt.plot(N_b[i])
+        # plt.show()
