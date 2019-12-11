@@ -1,9 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="2ac63e5a-436e-4015-8762-638a068d6d04" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-    </list>
+    <list default="true" id="2ac63e5a-436e-4015-8762-638a068d6d04" name="Default Changelist" comment="" />
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -35,40 +33,44 @@
   </component>
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
-      <file pinned="false" current-in-tab="true">
+      <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/ecg_pytorch/classifiers/run_sequence_model.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="-6751">
-              <caret line="72" selection-start-line="72" selection-end-line="72" />
+            <state relative-caret-position="180">
+              <caret line="12" column="83" lean-forward="true" selection-start-line="12" selection-end-line="12" selection-end-column="83" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/ecg_pytorch/__init__.py">
+          <provider selected="true" editor-type-id="text-editor" />
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/setup.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="60">
+              <caret line="4" lean-forward="true" selection-start-line="4" selection-end-line="4" />
               <folding>
-                <element signature="e#0#12#0" expanded="true" />
+                <element signature="e#0#36#0" expanded="true" />
               </folding>
             </state>
           </provider>
         </entry>
       </file>
       <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/ecg_pytorch/classifiers/compare_models.py">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="30">
-              <caret line="2" column="54" selection-start-line="2" selection-start-column="23" selection-end-line="2" selection-end-column="54" />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/ecg_pytorch/classifiers/__init__.py">
-          <provider selected="true" editor-type-id="text-editor" />
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/ecg_pytorch/classifiers/models/__init__.py">
-          <provider selected="true" editor-type-id="text-editor" />
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/ecg_pytorch/classifiers/inference/__init__.py">
           <provider selected="true" editor-type-id="text-editor" />
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="true">
+        <entry file="file://$PROJECT_DIR$/ecg_pytorch/train_configs.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="120">
+              <caret line="8" column="17" selection-start-line="8" selection-start-column="7" selection-end-line="8" selection-end-column="17" />
+            </state>
+          </provider>
         </entry>
       </file>
       <file pinned="false" current-in-tab="false">
@@ -123,6 +125,8 @@
       <find>smooth</find>
       <find>outputs_preds</find>
       <find>base_path</find>
+      <find>model_dir</find>
+      <find>ECGTrainConfig</find>
     </findStrings>
   </component>
   <component name="Git.Settings">
@@ -141,7 +145,6 @@
         <option value="$PROJECT_DIR$/ecg_pytorch/data_reader/ecg_dataset_lstm_weighted.py" />
         <option value="$PROJECT_DIR$/ecg_pytorch/classifiers/models/lstm.py" />
         <option value="$PROJECT_DIR$/ecg_pytorch/gan_models/models/ode_combined_conv_gan.py" />
-        <option value="$PROJECT_DIR$/setup.py" />
         <option value="$PROJECT_DIR$/ecg_pytorch/gan_models/models/ode_gan.py" />
         <option value="$PROJECT_DIR$/ecg_pytorch/gan_models/models/old_ode_combined.py" />
         <option value="$PROJECT_DIR$/ecg_pytorch/dynamical_model/utils.py" />
@@ -180,6 +183,7 @@
         <option value="$PROJECT_DIR$/ecg_pytorch/classifiers/compare_models_IAAI.py" />
         <option value="$PROJECT_DIR$/ecg_pytorch/classifiers/run_sequence_model.py" />
         <option value="$PROJECT_DIR$/ecg_pytorch/classifiers/__init__.py" />
+        <option value="$PROJECT_DIR$/setup.py" />
       </list>
     </option>
   </component>
@@ -206,12 +210,6 @@
               <item name="ecg_pytorch" type="b2602c69:ProjectViewProjectNode" />
               <item name="ecg_pytorch" type="462c0819:PsiDirectoryNode" />
               <item name="ecg_pytorch" type="462c0819:PsiDirectoryNode" />
-            </path>
-            <path>
-              <item name="ecg_pytorch" type="b2602c69:ProjectViewProjectNode" />
-              <item name="ecg_pytorch" type="462c0819:PsiDirectoryNode" />
-              <item name="ecg_pytorch" type="462c0819:PsiDirectoryNode" />
-              <item name="classifiers" type="462c0819:PsiDirectoryNode" />
             </path>
           </expand>
           <select />
@@ -390,12 +388,12 @@
       <workItem from="1565247998851" duration="40136000" />
       <workItem from="1573037534478" duration="2635000" />
       <workItem from="1574239130653" duration="2405000" />
-      <workItem from="1576062766822" duration="1027000" />
+      <workItem from="1576062766822" duration="1955000" />
     </task>
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="397387000" />
+    <option name="totallyTimeSpent" value="398315000" />
   </component>
   <component name="TodoView">
     <todo-panel id="selected-file">
@@ -408,6 +406,7 @@
   </component>
   <component name="ToolWindowManager">
     <frame x="-1920" y="0" width="1920" height="1080" extended-state="0" />
+    <editor active="true" />
     <layout>
       <window_info active="true" content_ui="combo" id="Project" order="0" visible="true" weight="0.24174654" />
       <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
@@ -425,7 +424,7 @@
       <window_info anchor="bottom" id="Version Control" order="10" />
       <window_info anchor="bottom" id="Database Changes" order="11" />
       <window_info anchor="bottom" id="Event Log" order="12" sideWeight="0.5042598" side_tool="true" weight="0.42553192" />
-      <window_info anchor="bottom" id="Terminal" order="13" sideWeight="0.49574015" visible="true" weight="0.17831814" />
+      <window_info anchor="bottom" id="Terminal" order="13" sideWeight="0.49574015" visible="true" weight="0.33333334" />
       <window_info anchor="bottom" id="Python Console" order="14" weight="0.32928064" />
       <window_info anchor="right" id="Commander" order="0" weight="0.4" />
       <window_info anchor="right" id="Ant Build" order="1" weight="0.25" />
@@ -510,7 +509,6 @@
     </breakpoint-manager>
   </component>
   <component name="editorHistoryManager">
-    <entry file="file://$PROJECT_DIR$/ecg_pytorch/classifiers/train_with_beats_from_simulator.py" />
     <entry file="file://$PROJECT_DIR$/ecg_pytorch/dynamical_model/Euler/euler.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="1200">
@@ -680,9 +678,6 @@
     <entry file="file://$PROJECT_DIR$/ecg_pytorch/gan_models/N_2225.html">
       <provider selected="true" editor-type-id="text-editor" />
     </entry>
-    <entry file="file://$PROJECT_DIR$/ecg_pytorch/__init__.py">
-      <provider selected="true" editor-type-id="text-editor" />
-    </entry>
     <entry file="file://$PROJECT_DIR$/ecg_pytorch/gan_models/N_2375.html">
       <provider selected="true" editor-type-id="text-editor" />
     </entry>
@@ -789,13 +784,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/ecg_pytorch/train_configs.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="120">
-          <caret line="8" column="17" selection-start-line="8" selection-start-column="7" selection-end-line="8" selection-end-column="17" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/ecg_pytorch/classifiers/compare_models.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="30">
@@ -827,13 +815,30 @@
     <entry file="file://$PROJECT_DIR$/ecg_pytorch/gan_models/models/__init__.py">
       <provider selected="true" editor-type-id="text-editor" />
     </entry>
+    <entry file="file://$PROJECT_DIR$/ecg_pytorch/__init__.py">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/setup.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="60">
+          <caret line="4" lean-forward="true" selection-start-line="4" selection-end-line="4" />
+          <folding>
+            <element signature="e#0#36#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/ecg_pytorch/classifiers/run_sequence_model.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-6751">
-          <caret line="72" selection-start-line="72" selection-end-line="72" />
-          <folding>
-            <element signature="e#0#12#0" expanded="true" />
-          </folding>
+        <state relative-caret-position="180">
+          <caret line="12" column="83" lean-forward="true" selection-start-line="12" selection-end-line="12" selection-end-column="83" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/ecg_pytorch/train_configs.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="120">
+          <caret line="8" column="17" selection-start-line="8" selection-start-column="7" selection-end-line="8" selection-end-column="17" />
         </state>
       </provider>
     </entry>

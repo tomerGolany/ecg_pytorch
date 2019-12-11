@@ -1,8 +1,12 @@
 import pickle
 from ecg_pytorch import train_configs
 
-full_path = train_configs.base + 'ecg_pytorch/ecg_pytorch/data_reader'
+# full_path = train_configs.base + 'ecg_pytorch/ecg_pytorch/data_reader'
 
+#
+# For colab use:
+#
+full_path = '/content/drive/My Drive/ecg_research'
 
 def load_ecg_input_from_pickle():
     with open(full_path + '/train_beats.pickle', 'rb') as handle:
