@@ -3,7 +3,6 @@ import numpy as np
 import torch
 from ecg_pytorch.data_reader import pickle_data
 from ecg_pytorch.dynamical_model import typical_beat_params, equations
-from matplotlib import pyplot as plt
 
 
 class EcgHearBeatsDataset(Dataset):

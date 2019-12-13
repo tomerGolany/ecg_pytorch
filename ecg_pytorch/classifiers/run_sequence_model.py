@@ -1,26 +1,18 @@
 import torch
-from ecg_pytorch.data_reader.ecg_dataset_lstm import ToTensor, EcgHearBeatsDataset, EcgHearBeatsDatasetTest
-import torchvision.transforms as transforms
 import torch.optim as optim
 import torch.nn as nn
 from tensorboardX import SummaryWriter
 import numpy as np
-from matplotlib import pyplot as plt
-from sklearn.metrics import roc_curve, auc
-from sklearn.utils.multiclass import unique_labels
-from sklearn.metrics import confusion_matrix
 from ecg_pytorch.classifiers.models import lstm
 from ecg_pytorch.train_configs import ECGTrainConfig, GeneratorAdditionalDataConfig
-from ecg_pytorch.gan_models.models import dcgan
-from ecg_pytorch.gan_models.models import vanila_gan
 import logging
-import time
 import os
-from ecg_pytorch.gan_models.models import ode_gan_aaai
 import shutil
 from ecg_pytorch.gan_models import checkpoint_paths
 import pickle
 from ecg_pytorch import train_configs
+from ecg_pytorch.data_reader import dataset_builder
+from ecg_pytorch.classifiers import metrics
 
 base_path = train_configs.base
 
@@ -34,212 +26,109 @@ def init_weights(m):
         torch.nn.init.xavier_uniform(m.weight_ih_l0.data)
 
 
-def plt_roc_curve(y_true, y_pred, classes, writer, total_iters):
-    """
+def eval_fn(data_loader, train_config, criterion, writer, total_iters, best_auc_scores):
+    with torch.no_grad():
 
-    In one Vs. All setting: positive class is -> [1,0] and negative is [0,1]
-    :param y_true:[[1,0,0,0,0], [0,1,0,0], [1,0,0,0,0],...]
-    :param y_pred: [0.34,0.2,0.1] , 0.2,...]
-    :param classes:5
-    :return:
-    """
-    fpr = {}
-    tpr = {}
-    roc_auc = {}
-    roc_auc_res = []
-    n_classes = len(classes)
-    for i in range(n_classes):
-        fpr[classes[i]], tpr[classes[i]], _ = roc_curve(y_true[:, i], y_pred[:, i])
-        roc_auc[classes[i]] = auc(fpr[classes[i]], tpr[classes[i]])
-        roc_auc_res.append(roc_auc[classes[i]])
-        fig = plt.figure()
-        lw = 2
-        plt.plot(fpr[classes[i]], tpr[classes[i]], color='darkorange',
-                 lw=lw, label='ROC curve (area = %0.2f)' % roc_auc[classes[i]])
-        plt.plot([0, 1], [0, 1], color='navy', lw=lw, linestyle='--')
-        plt.xlim([0.0, 1.0])
-        plt.ylim([0.0, 1.05])
-        plt.xlabel('False Positive Rate')
-        plt.ylabel('True Positive Rate')
-        plt.title('Receiver operating characteristic beat {}'.format(classes[i]))
-        plt.legend(loc="lower right")
-        writer.add_figure('test/roc_curve_beat_{}'.format(classes[i]), fig, total_iters)
-        plt.close()
-        fig.clf()
-        fig.clear()
-    return roc_auc_res
-
-
-def plot_confusion_matrix(y_true, y_pred, classes,
-                          normalize=False,
-                          title=None,
-                          cmap=plt.cm.Blues):
-    """
-    This function prints and plots the confusion matrix.
-    Normalization can be applied by setting `normalize=True`.
-    """
-    if not title:
-        if normalize:
-            title = 'Normalized confusion matrix'
+        if train_config.train_one_vs_all:
+            labels_total_one_hot = np.array([]).reshape((0, 2))
+            outputs_preds = np.array([]).reshape((0, 2))
         else:
-            title = 'Confusion matrix, without normalization'
+            labels_total_one_hot = np.array([]).reshape((0, 5))
+            outputs_preds = np.array([]).reshape((0, 5))
 
-    # Compute confusion matrix
-    cm = confusion_matrix(y_true, y_pred)
-    # Only use the labels that appear in the data
-    classes = classes[unique_labels(y_true, y_pred)]
-    normalize = True
-    if normalize:
-        cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
-        # print("Normalized confusion matrix")
+        labels_total = np.array([])
+        outputs_total = np.array([])
+        loss_hist = []
+        for _, test_data in enumerate(data_loader):
+            ecg_batch = test_data['cardiac_cycle'].float().to(device)
+            labels = test_data['label'].to(device)
+            labels_class = torch.max(labels, 1)[1]
+            outputs = net(ecg_batch)
+            loss = criterion(outputs, torch.max(labels, 1)[1])
+            loss_hist.append(loss.item())
+            outputs_class = torch.max(outputs, 1)[1]
+
+            labels_total_one_hot = np.concatenate((labels_total_one_hot, labels.cpu().numpy()))
+            labels_total = np.concatenate((labels_total, labels_class.cpu().numpy()))
+            outputs_total = np.concatenate((outputs_total, outputs_class.cpu().numpy()))
+            outputs_preds = np.concatenate((outputs_preds, outputs.cpu().numpy()))
+
+        outputs_total = outputs_total.astype(int)
+        labels_total = labels_total.astype(int)
+
+        # Accuracy and Loss:
+        accuracy = sum((outputs_total == labels_total)) / len(outputs_total)
+        writer.add_scalars('accuracy', {'Test set accuracy': accuracy}, global_step=total_iters)
+        loss = sum(loss_hist) / len(loss_hist)
+        writer.add_scalars('cross_entropy_loss', {'Test set loss': loss}, total_iters)
+
+        write_summaries(writer, train_config, labels_total, outputs_total, total_iters, 'test', best_auc_scores)
+
+
+def write_summaries(writer, train_config, labels_class, outputs_class, total_iters, data_set_type, best_auc_scores):
+
+    generator_beat_type = train_config.generator_details.beat_type
+
+    if train_config.train_one_vs_all:
+        fig, _ = metrics.plot_confusion_matrix(labels_class.cpu().numpy(), outputs_class.cpu().numpy(),
+                                               np.array([generator_beat_type, 'Others']))
     else:
-        pass
-        # print('Confusion matrix, without normalization')
+        fig, _ = metrics.plot_confusion_matrix(labels_class.cpu().numpy(), outputs_class.cpu().numpy(),
+                                               np.array(['N', 'S', 'V', 'F', 'Q']))
 
-    # print(cm)
+    writer.add_figure('{}/confusion_matrix'.format(data_set_type), fig, total_iters)
 
-    fig, ax = plt.subplots()
-    im = ax.imshow(cm, interpolation='nearest', cmap=cmap)
-    ax.figure.colorbar(im, ax=ax)
-    # We want to show all ticks...
-    ax.set(xticks=np.arange(cm.shape[1]),
-           yticks=np.arange(cm.shape[0]),
-           # ... and label them with the respective list entries
-           xticklabels=classes, yticklabels=classes,
-           title=title,
-           ylabel='True label',
-           xlabel='Predicted label')
+    if data_set_type == 'test':
+        #
+        # Check AUC values:
+        #
+        if train_config.train_one_vs_all:
+            auc_roc = metrics.plt_roc_curve(labels_class, outputs_class,
+                                            np.array([generator_beat_type, 'Other']),
+                                            writer,
+                                            total_iters)
+            for i_auc in range(2):
+                if auc_roc[i_auc] > best_auc_scores[i_auc]:
+                    best_auc_scores[i_auc] = auc_roc[i_auc]
 
-    # Rotate the tick labels and set their alignment.
-    plt.setp(ax.get_xticklabels(), rotation=45, ha="right",
-             rotation_mode="anchor")
-
-    # Loop over data dimensions and create text annotations.
-    fmt = '.2f' if normalize else 'd'
-    thresh = cm.max() / 2.
-    for i in range(cm.shape[0]):
-        for j in range(cm.shape[1]):
-            ax.text(j, i, format(cm[i, j], fmt),
-                    ha="center", va="center",
-                    color="white" if cm[i, j] > thresh else "black")
-    fig.tight_layout()
-    return fig, ax
+        else:
+            auc_roc = metrics.plt_roc_curve(labels_class, outputs_class,
+                                    np.array(['N', 'S', 'V', 'F', 'Q']),
+                                    writer,
+                                    total_iters)
+            for i_auc in range(4):
+                if auc_roc[i_auc] > best_auc_scores[i_auc]:
+                    best_auc_scores[i_auc] = auc_roc[i_auc]
 
 
 def train_classifier(net, model_dir, train_config=None):
     """
 
-    :param network:
+    :param net: Network type - Type of recurrent network.
     :return:
     """
-    #
-    # Get configs:
-    #
-    batch_size = train_config.batch_size
     num_of_epochs = train_config.num_epochs
     lr = train_config.lr
     device = train_config.device
-    add_from_gan = train_config.add_data_from_gan
-    best_auc_scores = [0, 0, 0, 0]
+    batch_size = train_config.batch_size
 
-    composed = transforms.Compose([ToTensor()])
-    if train_config.train_one_vs_all:
-        dataset = EcgHearBeatsDataset(transform=composed, beat_type=train_config.generator_details.beat_type,
-                                      one_vs_all=True, lstm_setting=False)
-        testset = EcgHearBeatsDatasetTest(transform=composed, beat_type=train_config.generator_details.beat_type,
-                                          one_vs_all=True, lstm_setting=False)
-        best_auc_scores = [0, 0]
-    else:
-        dataset = EcgHearBeatsDataset(transform=composed)
-        testset = EcgHearBeatsDatasetTest(transform=composed)
-
-    testdataloader = torch.utils.data.DataLoader(testset, batch_size=300,
-                                                 shuffle=True, num_workers=1)
-
-    # num_examples_to_add = train_config.generator_details.num_examples_to_add
-    # generator_beat_type = train_config.generator_details.beat_type
-    # dataset.add_noise(num_examples_to_add, generator_beat_type)
-
-    #
-    # Check if to add data from GAN:
-    #
-    if add_from_gan:
-
-        num_examples_to_add = train_config.generator_details.num_examples_to_add
-        generator_checkpoint_path = train_config.generator_details.checkpoint_path
-        generator_beat_type = train_config.generator_details.beat_type
-        gan_type = train_config.generator_details.gan_type
-        logging.info("Adding {} samples of type {} from GAN {}".format(num_examples_to_add, generator_beat_type,
-                                                                       gan_type))
-        logging.info("Size of training data before additional data from GAN: {}".format(len(dataset)))
-        logging.info("#N: {}\t #S: {}\t #V: {}\t #F: {}\t".format(dataset.len_beat('N'), dataset.len_beat('S'),
-                                                                  dataset.len_beat('V'), dataset.len_beat('F')))
-        if num_examples_to_add > 0:
-            if gan_type == 'DCGAN':
-                gNet = dcgan.DCGenerator(0)
-                dataset.add_beats_from_generator(gNet, num_examples_to_add,
-                                                 generator_checkpoint_path,
-                                                 generator_beat_type)
-            elif gan_type == 'ODE_GAN':
-                gNet = ode_gan_aaai.DCGenerator(0)
-                dataset.add_beats_from_generator(gNet, num_examples_to_add,
-                                                 generator_checkpoint_path,
-                                                 generator_beat_type)
-            elif gan_type == 'SIMULATOR':
-                dataset.add_beats_from_simulator(num_examples_to_add, generator_beat_type)
-
-            elif gan_type == 'VANILA_GAN':
-                gNet = vanila_gan.VGenerator(0)
-                dataset.add_beats_from_generator(gNet, num_examples_to_add,
-                                                 generator_checkpoint_path,
-                                                 generator_beat_type)
-
-            elif gan_type == 'VANILA_GAN_ODE':
-                gNet = vanila_gan.VGenerator(0)
-                dataset.add_beats_from_generator(gNet, num_examples_to_add,
-                                                 generator_checkpoint_path,
-                                                 generator_beat_type)
-
-            elif gan_type == 'NOISE':
-                dataset.add_noise(num_examples_to_add, generator_beat_type)
-
-            else:
-                raise ValueError("Unknown gan type {}".format(gan_type))
-
-        logging.info("Size of training data after additional data from GAN: {}".format(len(dataset)))
-        logging.info("#N: {}\t #S: {}\t #V: {}\t #F: {}\t".format(dataset.len_beat('N'), dataset.len_beat('S'),
-                                                                  dataset.len_beat('V'), dataset.len_beat('F')))
-
-    if train_config.weighted_sampling:
-        weights_for_balance = dataset.make_weights_for_balanced_classes()
-        weights_for_balance = torch.DoubleTensor(weights_for_balance)
-        sampler = torch.utils.data.sampler.WeightedRandomSampler(
-            weights=weights_for_balance,
-            num_samples=len(weights_for_balance),
-            replacement=True)
-        dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size,
-                                                 num_workers=1, sampler=sampler)
-    else:
-        dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size,
-                                                 num_workers=1, shuffle=True)
+    train_data_loader, test_data_loader, best_auc_scores = dataset_builder.build(train_config)
 
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(net.parameters(), lr=lr)
     writer = SummaryWriter(model_dir, max_queue=1000)
     total_iters = 0
-    num_iters_per_epoch = int(np.floor(len(dataset) / batch_size) + batch_size)
+    num_iters_per_epoch = int(np.floor(len(train_data_loader) / batch_size) + batch_size)
+
     for epoch in range(num_of_epochs):  # loop over the dataset multiple times
-        for i, data in enumerate(dataloader):
+        for i, data in enumerate(train_data_loader):
             total_iters += 1
-            # get the inputs
             ecg_batch = data['cardiac_cycle'].float().to(device)
             b_size = ecg_batch.shape[0]
             labels = data['label'].to(device)
-
-
             labels_class = torch.max(labels, 1)[1]
-
             labels_str = data['beat_type']
+
             logging.debug("batch labels: {}".format(labels_str))
 
             # zero the parameter gradients
@@ -265,86 +154,16 @@ def train_classifier(net, model_dir, train_config=None):
                                                                                                           loss.item(),
                                                                                                           accuracy.item()))
             if total_iters % 300 == 0:
-                if train_config.train_one_vs_all:
-                    fig, _ = plot_confusion_matrix(labels_class.cpu().numpy(), outputs_class.cpu().numpy(),
-                                                   np.array([generator_beat_type, 'Others']))
-                else:
-                    fig, _ = plot_confusion_matrix(labels_class.cpu().numpy(), outputs_class.cpu().numpy(),
-                                                   np.array(['N', 'S', 'V', 'F', 'Q']))
-
-                writer.add_figure('train/confusion_matrix', fig, total_iters)
+                write_summaries(writer, train_config, labels_class, outputs_class, total_iters, 'train', best_auc_scores)
 
                 grad_norm = get_gradient_norm_l2(net)
                 writer.add_scalar('gradients_norm', grad_norm, total_iters)
                 logging.info("Norm of gradients = {}.".format(grad_norm))
 
             if total_iters % 200 == 0:
-                with torch.no_grad():
 
-                    if train_config.train_one_vs_all:
-                        labels_total_one_hot = np.array([]).reshape((0, 2))
-                        outputs_preds = np.array([]).reshape((0, 2))
-                    else:
-                        labels_total_one_hot = np.array([]).reshape((0, 5))
-                        outputs_preds = np.array([]).reshape((0, 5))
+                eval_fn(test_data_loader, train_config, criterion, writer, total_iters, best_auc_scores)
 
-                    labels_total = np.array([])
-                    outputs_total = np.array([])
-                    loss_hist = []
-                    for _, test_data in enumerate(testdataloader):
-                        ecg_batch = test_data['cardiac_cycle'].float().to(device)
-                        labels = test_data['label'].to(device)
-                        # logging.info("label positive: ", labels.cpu().nunpy())
-
-                        labels_class = torch.max(labels, 1)[1]
-                        outputs = net(ecg_batch)
-                        # print(outputs.cpu().numpy().shape)
-                        loss = criterion(outputs, torch.max(labels, 1)[1])
-                        loss_hist.append(loss.item())
-                        outputs_class = torch.max(outputs, 1)[1]
-
-                        labels_total_one_hot = np.concatenate((labels_total_one_hot, labels.cpu().numpy()))
-                        labels_total = np.concatenate((labels_total, labels_class.cpu().numpy()))
-                        outputs_total = np.concatenate((outputs_total, outputs_class.cpu().numpy()))
-                        outputs_preds = np.concatenate((outputs_preds, outputs.cpu().numpy()))
-
-                    outputs_total = outputs_total.astype(int)
-                    labels_total = labels_total.astype(int)
-
-                    if train_config.train_one_vs_all:
-                        fig, _ = plot_confusion_matrix(labels_total, outputs_total,
-                                                       np.array([generator_beat_type, 'Other']))
-                    else:
-                        fig, _ = plot_confusion_matrix(labels_total, outputs_total,
-                                                       np.array(['N', 'S', 'V', 'F', 'Q']))
-
-                    # Accuracy and Loss:
-                    accuracy = sum((outputs_total == labels_total)) / len(outputs_total)
-                    writer.add_scalars('accuracy', {'Test set accuracy': accuracy}, global_step=total_iters)
-                    writer.add_figure('test/confusion_matrix', fig, total_iters)
-                    loss = sum(loss_hist) / len(loss_hist)
-                    writer.add_scalars('cross_entropy_loss', {'Test set loss': loss}, total_iters)
-
-                    #
-                    # Check AUC values:
-                    #
-                    if train_config.train_one_vs_all:
-                        auc_roc = plt_roc_curve(labels_total_one_hot, outputs_preds,
-                                                np.array([generator_beat_type, 'Other']),
-                                                writer,
-                                                total_iters)
-                        for i_auc in range(2):
-                            if auc_roc[i_auc] > best_auc_scores[i_auc]:
-                                best_auc_scores[i_auc] = auc_roc[i_auc]
-
-                    else:
-                        auc_roc = plt_roc_curve(labels_total_one_hot, outputs_preds,
-                                                np.array(['N', 'S', 'V', 'F', 'Q']),
-                                                writer,
-                                                total_iters)
-                        for i_auc in range(4):
-                            if auc_roc[i_auc] > best_auc_scores[i_auc]:
-                                best_auc_scores[i_auc] = auc_roc[i_auc]
     writer.close()
     return best_auc_scores
 
@@ -550,19 +369,11 @@ def train_with_noise():
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    beat_type = 'N'
-    gan_type = 'ODE_GAN'
-    # gan_type = 'SIMULATOR'
-    device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
-    # train_mult(beat_type, gan_type, device)
-
-    # chk_dir = base_tomer_remote + 'ecg_pytorch/ecg_pytorch/gan_models/tensorboard/ecg_ode_gan_S_beat'
-    # find_optimal_checkpoint(chk_dir, beat_type, gan_type, device, 500)
-
-    model_dir = base_path + 'ecg_pytorch/ecg_pytorch/classifiers/tensorboard/multi_class_lstm_1'
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    model_dir = base_path + 'ecg_pytorch/ecg_pytorch/classifiers/tensorboard/multi_class_lstm'
     net = lstm.ECGLSTM(5, 512, 5, 2).to(device)
-    train_config = ECGTrainConfig(num_epochs=5, batch_size=20, lr=0.0002, weighted_loss=False,
+    train_config_1 = ECGTrainConfig(num_epochs=5, batch_size=20, lr=0.0002, weighted_loss=False,
                                   weighted_sampling=True,
                                   device=device, add_data_from_gan=False, generator_details=None,
                                   train_one_vs_all=False)
-    train_classifier(net, model_dir, train_config=train_config)
+    train_classifier(net, model_dir, train_config=train_config_1)

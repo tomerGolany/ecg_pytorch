@@ -19,7 +19,7 @@
         </fileTransfer>
       </webServer>
       <webServer id="0fb5399f-febc-4797-9733-d367be898862" name="niv1" url="http://132.68.43.102">
-        <fileTransfer host="132.68.43.102" port="22" rootFolder="/home/tomer" accessType="SFTP">
+        <fileTransfer host="132.68.43.102" port="22" rootFolder="/media/drive" accessType="SFTP">
           <advancedOptions>
             <advancedOptions dataProtectionLevel="Private" passiveMode="true" shareSSLContext="true" />
           </advancedOptions>

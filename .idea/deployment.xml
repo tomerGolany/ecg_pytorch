@@ -5,7 +5,7 @@
       <paths name="niv1">
         <serverdata>
           <mappings>
-            <mapping deploy="/tomer/ecg_pytorch" local="$PROJECT_DIR$" web="/" />
+            <mapping deploy="/ecg_pytorch" local="$PROJECT_DIR$" web="/" />
           </mappings>
         </serverdata>
       </paths>
