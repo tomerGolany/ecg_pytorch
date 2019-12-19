@@ -6,10 +6,11 @@ import torch.utils.data
 import torchvision.transforms as transforms
 import numpy as np
 import matplotlib.pyplot as plt
-from ecg_pytorch.data_reader import ecg_dataset
+from ecg_pytorch.data_reader import ecg_dataset_lstm
 from tensorboardX import SummaryWriter
 from ecg_pytorch.gan_models.models import dcgan
 from ecg_pytorch.gan_models.models import vanila_gan
+import logging
 
 
 # custom weights initialization called on netG and netD
@@ -28,8 +29,8 @@ def train_ecg_gan(batch_size, num_train_steps, generator, discriminator, model_d
     writer = SummaryWriter(model_dir)
     # 1. create the ECG dataset:
     # composed = transforms.Compose([ecg_dataset.Scale(), ecg_dataset.Smooth(), ecg_dataset.ToTensor()])
-    composed = transforms.Compose([ecg_dataset.ToTensor()])
-    dataset = ecg_dataset.EcgHearBeatsDataset(transform=composed, beat_type='F')
+    composed = transforms.Compose([ecg_dataset_lstm.ToTensor()])
+    dataset = ecg_dataset_lstm.EcgHearBeatsDataset(transform=composed, beat_type='S', lstm_setting=False)
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size,
                                              shuffle=True, num_workers=1)
     print("Size of real dataset is {}".format(len(dataset)))
@@ -216,14 +217,15 @@ def get_gradient_norm_l2(model):
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
     # netG = Generator(0, "cpu")
     # netG = DeltaGenerator(0)
-    netG = vanila_gan.VGenerator(0)
-    # netG = dcgan.DCGenerator(0)
-    # netG.apply(weights_init)
+    # netG = vanila_gan.VGenerator(0)
+    netG = dcgan.DCGenerator(0)
+    netG.apply(weights_init)
     # netD = Discriminator(0)
-    # netD = dcgan.DCDiscriminator(0)
-    # netD.apply(weights_init)
-    netD = vanila_gan.VDiscriminator(0)
-    model_dir = 'tensorboard/ecg_vanilla_gan_F_beat'
+    netD = dcgan.DCDiscriminator(0)
+    netD.apply(weights_init)
+    # netD = vanila_gan.VDiscriminator(0)
+    model_dir = 'tensorboard/ecg_dcgan_s_beat'
     train_ecg_gan(50, 2000, netG, netD, model_dir)

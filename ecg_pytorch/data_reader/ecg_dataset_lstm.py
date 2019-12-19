@@ -3,7 +3,7 @@ import numpy as np
 import torch
 from ecg_pytorch.data_reader import pickle_data
 from ecg_pytorch.dynamical_model import typical_beat_params, equations
-
+from ecg_pytorch.data_reader import preprocess_data
 
 class EcgHearBeatsDataset(Dataset):
     """ECG heart beats dataset."""
@@ -15,9 +15,10 @@ class EcgHearBeatsDataset(Dataset):
         :param beat_type:
         """
         self.lstm_setting = lstm_setting
-        self.train, self.val, _ = pickle_data.load_ecg_input_from_pickle()
+        # self.train, self.val, _ = pickle_data.load_ecg_input_from_pickle()
         self.one_vs_all = False
-        self.train = np.concatenate((self.train, self.val), axis=0)
+        # self.train = np.concatenate((self.train, self.val), axis=0)
+        self.train, _  = preprocess_data.build_dataset()
         if beat_type is not None and one_vs_all is None:
             self.train = np.array([sample for sample in self.train if sample['beat_type'] == beat_type])
 
@@ -125,11 +126,39 @@ class EcgHearBeatsDataset(Dataset):
         self.train = np.concatenate((self.train, input_noise))
 
 
+class Scale(object):
+    def __call__(self, sample):
+        heartbeat, label = sample['cardiac_cycle'], sample['label']
+        heartbeat = scale_signal(heartbeat)
+        return {'cardiac_cycle': heartbeat,
+                'label': label,
+                'beat_type': sample['beat_type']}
+
+
+def scale_signal(signal, min_val=-0.01563, max_val=0.042557):
+    """
+
+    :param min:
+    :param max:
+    :return:
+    """
+    # Scale signal to lie between -0.4 and 1.2 mV :
+    scaled = np.interp(signal, (signal.min(), signal.max()), (min_val, max_val))
+
+    # zmin = min(signal)
+    # zmax = max(signal)
+    # zrange = zmax - zmin
+    # # for (i=1; i <= Nts; i++)
+    # scaled = [(z - zmin) * max_val / zrange + min_val for z in signal]
+    return scaled
+
 class EcgHearBeatsDatasetTest(Dataset):
     """ECG heart beats dataset."""
 
     def __init__(self, transform=None, beat_type=None, one_vs_all=None, lstm_setting=True):
-        _, _, self.test = pickle_data.load_ecg_input_from_pickle()
+        #  _, _, self.test = pickle_data.load_ecg_input_from_pickle()
+        self.train, self.test = preprocess_data.build_dataset()
+        self.test = self.test + self.train
         self.lstm_setting = lstm_setting
         self.one_vs_all = False
         if beat_type is not None and one_vs_all is None:
@@ -166,6 +195,15 @@ class EcgHearBeatsDatasetTest(Dataset):
             sample = self.transform(sample)
         return sample
 
+    def len_beat(self, beat_Type):
+        return len(np.array([sample for sample in self.test if sample['beat_type'] == beat_Type]))
+
+    def print_statistics(self):
+        count = np.array([self.len_beat('N'), self.len_beat('S'), self.len_beat('V'),
+                          self.len_beat('F'), self.len_beat('Q')])
+        print("Beat N: #{}\t Beat S: #{}\t Beat V: #{}\n Beat F: #{}\t Beat Q: #{}".format(count[0], count[1], count[2],
+                                                                                           count[3], count[4]))
+
 
 class ToTensor(object):
     """Convert ndarrays in sample to Tensors."""
@@ -175,3 +213,8 @@ class ToTensor(object):
         return {'cardiac_cycle': (torch.from_numpy(heartbeat)).double(),
                 'label': torch.from_numpy(label),
                 'beat_type': sample['beat_type']}
+
+
+if __name__ == "__main__":
+    test_set = EcgHearBeatsDatasetTest()
+    test_set.print_statistics()

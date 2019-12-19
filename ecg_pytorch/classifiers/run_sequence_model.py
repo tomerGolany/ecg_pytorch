@@ -3,7 +3,7 @@ import torch.optim as optim
 import torch.nn as nn
 from tensorboardX import SummaryWriter
 import numpy as np
-from ecg_pytorch.classifiers.models import lstm
+from ecg_pytorch.classifiers.models import lstm, deep_residual_conv
 from ecg_pytorch.train_configs import ECGTrainConfig, GeneratorAdditionalDataConfig
 import logging
 import os
@@ -13,6 +13,7 @@ import pickle
 from ecg_pytorch import train_configs
 from ecg_pytorch.data_reader import dataset_builder
 from ecg_pytorch.classifiers import metrics
+
 
 base_path = train_configs.base
 
@@ -26,7 +27,9 @@ def init_weights(m):
         torch.nn.init.xavier_uniform(m.weight_ih_l0.data)
 
 
-def eval_fn(data_loader, train_config, criterion, writer, total_iters, best_auc_scores):
+def predict_fn(data_loader, train_config, criterion, writer, total_iters, best_auc_scores):
+    logging.info("Performing evaluation:")
+    softmax_layer = nn.Softmax(dim=1)
     with torch.no_grad():
 
         if train_config.train_one_vs_all:
@@ -36,44 +39,48 @@ def eval_fn(data_loader, train_config, criterion, writer, total_iters, best_auc_
             labels_total_one_hot = np.array([]).reshape((0, 5))
             outputs_preds = np.array([]).reshape((0, 5))
 
-        labels_total = np.array([])
-        outputs_total = np.array([])
+        labels_ind_total = np.array([])
+        outputs_ind_total = np.array([])
         loss_hist = []
         for _, test_data in enumerate(data_loader):
             ecg_batch = test_data['cardiac_cycle'].float().to(device)
             labels = test_data['label'].to(device)
-            labels_class = torch.max(labels, 1)[1]
-            outputs = net(ecg_batch)
-            loss = criterion(outputs, torch.max(labels, 1)[1])
+            # logging.info("labels shape: {}. first labels in batch: {}".format(labels.shape, labels[0]))
+            labels_ind = torch.max(labels, 1)[1]
+            preds_before_softmax = net(ecg_batch)
+            # logging.info(
+            #     "output before softmax shape: {}. first in batch: {}".format(preds_before_softmax.shape,
+            #                                                                  preds_before_softmax[0]))
+            probs_after_softmax = softmax_layer(preds_before_softmax)
+            # logging.info(
+            #     "output softmax shape: {}. first in batch: {}".format(probs_after_softmax.shape,
+            #                                                           probs_after_softmax[0]))
+
+            loss = criterion(preds_before_softmax, torch.max(labels, 1)[1])
             loss_hist.append(loss.item())
-            outputs_class = torch.max(outputs, 1)[1]
+            outputs_class = torch.max(preds_before_softmax, 1)[1]
 
             labels_total_one_hot = np.concatenate((labels_total_one_hot, labels.cpu().numpy()))
-            labels_total = np.concatenate((labels_total, labels_class.cpu().numpy()))
-            outputs_total = np.concatenate((outputs_total, outputs_class.cpu().numpy()))
-            outputs_preds = np.concatenate((outputs_preds, outputs.cpu().numpy()))
+            labels_ind_total = np.concatenate((labels_ind_total, labels_ind.cpu().numpy()))
+            outputs_ind_total = np.concatenate((outputs_ind_total, outputs_class.cpu().numpy()))
+            outputs_preds = np.concatenate((outputs_preds, probs_after_softmax.cpu().numpy()))
 
-        outputs_total = outputs_total.astype(int)
-        labels_total = labels_total.astype(int)
+        outputs_ind_total = outputs_ind_total.astype(int)
+        labels_ind_total = labels_ind_total.astype(int)
 
-        # Accuracy and Loss:
-        accuracy = sum((outputs_total == labels_total)) / len(outputs_total)
-        writer.add_scalars('accuracy', {'Test set accuracy': accuracy}, global_step=total_iters)
         loss = sum(loss_hist) / len(loss_hist)
         writer.add_scalars('cross_entropy_loss', {'Test set loss': loss}, total_iters)
+        return labels_ind_total, outputs_ind_total, labels_total_one_hot, outputs_preds
 
-        write_summaries(writer, train_config, labels_total, outputs_total, total_iters, 'test', best_auc_scores)
 
-
-def write_summaries(writer, train_config, labels_class, outputs_class, total_iters, data_set_type, best_auc_scores):
-
-    generator_beat_type = train_config.generator_details.beat_type
-
+def write_summaries(writer, train_config, labels_class, outputs_class, total_iters, data_set_type, best_auc_scores,
+                    output_probabilites=None, labels_one_hot=None):
     if train_config.train_one_vs_all:
-        fig, _ = metrics.plot_confusion_matrix(labels_class.cpu().numpy(), outputs_class.cpu().numpy(),
+        generator_beat_type = train_config.generator_details.beat_type
+        fig, _ = metrics.plot_confusion_matrix(labels_class, outputs_class,
                                                np.array([generator_beat_type, 'Others']))
     else:
-        fig, _ = metrics.plot_confusion_matrix(labels_class.cpu().numpy(), outputs_class.cpu().numpy(),
+        fig, _ = metrics.plot_confusion_matrix(labels_class, outputs_class,
                                                np.array(['N', 'S', 'V', 'F', 'Q']))
 
     writer.add_figure('{}/confusion_matrix'.format(data_set_type), fig, total_iters)
@@ -83,7 +90,8 @@ def write_summaries(writer, train_config, labels_class, outputs_class, total_ite
         # Check AUC values:
         #
         if train_config.train_one_vs_all:
-            auc_roc = metrics.plt_roc_curve(labels_class, outputs_class,
+            generator_beat_type = train_config.generator_details.beat_type
+            auc_roc = metrics.plt_roc_curve(labels_one_hot, output_probabilites,
                                             np.array([generator_beat_type, 'Other']),
                                             writer,
                                             total_iters)
@@ -92,21 +100,31 @@ def write_summaries(writer, train_config, labels_class, outputs_class, total_ite
                     best_auc_scores[i_auc] = auc_roc[i_auc]
 
         else:
-            auc_roc = metrics.plt_roc_curve(labels_class, outputs_class,
-                                    np.array(['N', 'S', 'V', 'F', 'Q']),
-                                    writer,
-                                    total_iters)
+            auc_roc = metrics.plt_roc_curve(labels_one_hot, output_probabilites,
+                                            np.array(['N', 'S', 'V', 'F', 'Q']),
+                                            writer,
+                                            total_iters)
+
+            metrics.plt_precision_recall_curve(labels_one_hot, output_probabilites,
+                                            np.array(['N', 'S', 'V', 'F', 'Q']),
+                                            writer,
+                                            total_iters)
+
             for i_auc in range(4):
                 if auc_roc[i_auc] > best_auc_scores[i_auc]:
                     best_auc_scores[i_auc] = auc_roc[i_auc]
 
 
-def train_classifier(net, model_dir, train_config=None):
+def model_fn(network_object, model_dir, train_config=None):
     """
 
-    :param net: Network type - Type of recurrent network.
+    :param network_object: Network type - Type of recurrent network.
     :return:
     """
+    logging.info("Train configurations: {}".format(train_config))
+    # with open(os.path.join(model_dir, 'pipeline.config'), 'wb') as fd:
+    #     fd.write(str.encode("{}".format(train_config)))
+
     num_of_epochs = train_config.num_epochs
     lr = train_config.lr
     device = train_config.device
@@ -114,8 +132,14 @@ def train_classifier(net, model_dir, train_config=None):
 
     train_data_loader, test_data_loader, best_auc_scores = dataset_builder.build(train_config)
 
+    if train_config.train_one_vs_all:
+        label_names = np.array([train_config.generator_details.beat_type, 'Others'])
+    else:
+        label_names = np.array(['N', 'S', 'V', 'F', 'Q'])
+
+
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(net.parameters(), lr=lr)
+    optimizer = optim.Adam(network_object.parameters(), lr=lr)
     writer = SummaryWriter(model_dir, max_queue=1000)
     total_iters = 0
     num_iters_per_epoch = int(np.floor(len(train_data_loader) / batch_size) + batch_size)
@@ -132,10 +156,10 @@ def train_classifier(net, model_dir, train_config=None):
             logging.debug("batch labels: {}".format(labels_str))
 
             # zero the parameter gradients
-            net.zero_grad()
+            network_object.zero_grad()
 
             # forward + backward + optimize
-            outputs = net(ecg_batch)
+            outputs = network_object(ecg_batch)
 
             outputs_class = torch.max(outputs, 1)[1]
             accuracy = (outputs_class == labels_class).sum().float() / b_size
@@ -149,20 +173,45 @@ def train_classifier(net, model_dir, train_config=None):
             # print statistics
             #
             if total_iters % 10 == 0:
-                logging.info("Epoch {}. Iteration {}/{}.\t Batch train loss = {:.2f}. Accuracy batch train = {:.2f}".format(epoch + 1, i,
-                                                                                                          num_iters_per_epoch,
-                                                                                                          loss.item(),
-                                                                                                          accuracy.item()))
+                logging.info(
+                    "Epoch {}. Iteration {}/{}.\t Batch train loss = {:.2f}. Accuracy batch train = {:.2f}".format(
+                        epoch + 1, i,
+                        num_iters_per_epoch,
+                        loss.item(),
+                        accuracy.item()))
             if total_iters % 300 == 0:
-                write_summaries(writer, train_config, labels_class, outputs_class, total_iters, 'train', best_auc_scores)
+                write_summaries(writer, train_config, labels_class.cpu().numpy(), outputs_class.cpu().numpy(),
+                                total_iters, 'train', best_auc_scores)
 
-                grad_norm = get_gradient_norm_l2(net)
+                grad_norm = get_gradient_norm_l2(network_object)
                 writer.add_scalar('gradients_norm', grad_norm, total_iters)
                 logging.info("Norm of gradients = {}.".format(grad_norm))
 
             if total_iters % 200 == 0:
+                labels_ind_total, outputs_ind_total, labels_total_one_hot, outputs_preds = predict_fn(test_data_loader,
+                                                                                                      train_config,
+                                                                                                      criterion, writer,
+                                                                                                      total_iters,
+                                                                                                      best_auc_scores)
 
-                eval_fn(test_data_loader, train_config, criterion, writer, total_iters, best_auc_scores)
+                accuracy = sum((outputs_ind_total == labels_ind_total)) / len(outputs_ind_total)
+                writer.add_scalars('accuracy', {'Test set accuracy': accuracy}, global_step=total_iters)
+
+                logging.info("total output preds shape: {}. labels_total_one_hot shape: {}".format(outputs_preds.shape,
+                                                                                                   labels_total_one_hot.shape))
+                write_summaries(writer, train_config, labels_ind_total, outputs_ind_total, total_iters, 'test',
+                                best_auc_scores,
+                                outputs_preds, labels_total_one_hot)
+
+        labels_ind_total, outputs_ind_total, labels_total_one_hot, outputs_preds = predict_fn(test_data_loader,
+                                                                                              train_config, criterion,
+                                                                                              writer, total_iters,
+                                                                                              best_auc_scores)
+
+        metrics.add_roc_curve_bokeh(labels_total_one_hot, outputs_preds,
+                                                label_names, model_dir, epoch)
+
+        metrics.plt_precision_recall_bokeh(labels_total_one_hot, outputs_preds, label_names, model_dir, epoch)
 
     writer.close()
     return best_auc_scores
@@ -245,6 +294,7 @@ def train_mult(beat_type, gan_type, device):
         writer.add_scalar('mean_auc', np.mean(best_auc_per_run), n)
         writer.add_scalar('max_auc', max(best_auc_per_run), n)
     writer.close()
+
     #
     # Save data in pickle:
     #
@@ -370,10 +420,20 @@ def train_with_noise():
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    model_dir = base_path + 'ecg_pytorch/ecg_pytorch/classifiers/tensorboard/multi_class_lstm'
-    net = lstm.ECGLSTM(5, 512, 5, 2).to(device)
-    train_config_1 = ECGTrainConfig(num_epochs=5, batch_size=20, lr=0.0002, weighted_loss=False,
-                                  weighted_sampling=True,
-                                  device=device, add_data_from_gan=False, generator_details=None,
-                                  train_one_vs_all=False)
-    train_classifier(net, model_dir, train_config=train_config_1)
+    logging.info("Devices: {}".format(device))
+    model_dir = base_path + 'ecg_pytorch/ecg_pytorch/classifiers/tensorboard/s_resnet_raw/dcgan_10000/'
+
+
+    # net = lstm.ECGLSTM(5, 512, 2, 2).to(device)
+
+    net = deep_residual_conv.Net(2).to(device)
+
+
+    gen_details = GeneratorAdditionalDataConfig(beat_type='S', checkpoint_path=checkpoint_paths.DCGAN_S_CHK,
+                                                    num_examples_to_add=10000, gan_type=dataset_builder.GanType.DCGAN)
+
+    train_config_1 = ECGTrainConfig(num_epochs=15, batch_size=300, lr=0.0001, weighted_loss=False,
+                                    weighted_sampling=False,
+                                    device=device, add_data_from_gan=True, generator_details=gen_details,
+                                    train_one_vs_all=True)
+    model_fn(net, model_dir, train_config=train_config_1)

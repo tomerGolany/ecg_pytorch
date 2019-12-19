@@ -20,7 +20,7 @@ ODE_GAN_F_CHK = base_path + 'ecg_pytorch/ecg_pytorch/gan_models/tensorboard/ecg_
                             'checkpoint_epoch_933_iters_2800'
 
 ODE_GAN_V_CHK = base_path + 'ecg_pytorch/ecg_pytorch/gan_models/tensorboard/ecg_ode_gan_V_beat/' \
-    'checkpoint_epoch_200_iters_4800'
+    'checkpoint_epoch_51_iters_1350'
 
 #
 # DCGAN:
@@ -28,11 +28,11 @@ ODE_GAN_V_CHK = base_path + 'ecg_pytorch/ecg_pytorch/gan_models/tensorboard/ecg_
 DCGAN_N_CHK = base_path + 'ecg_pytorch/ecg_pytorch/gan_models/tensorboard/ecg_dcgan_N_beat/' \
                           'checkpoint_epoch_0_iters_401'
 
-DCGAN_S_CHK = base_path + 'ecg_pytorch/ecg_pytorch/gan_models/tensorboard/ecg_dcgan_S_beat/' \
-                          'checkpoint_epoch_46_iters_829'
+DCGAN_S_CHK = base_path + 'ecg_pytorch/ecg_pytorch/gan_models/tensorboard/ecg_dcgan_s_beat/' \
+                          'checkpoint_epoch_94_iters_1800'
 
-DCGAN_V_CHK = base_path + 'ecg_pytorch/ecg_pytorch/gan_models/tensorboard/ecg_dcgan_V_beat/' \
-                          'checkpoint_epoch_15_iters_1066'
+DCGAN_V_CHK = base_path + 'ecg_pytorch/ecg_pytorch/gan_models/tensorboard/dcgan_v_beat/' \
+                          'checkpoint_epoch_21_iters_1600'
 
 DCGAN_F_CHK = base_path + 'ecg_pytorch/ecg_pytorch/gan_models/tensorboard/' \
                           'ecg_dcgan_F_beat/checkpoint_epoch_50_iters_451'
@@ -42,9 +42,9 @@ DCGAN_F_CHK = base_path + 'ecg_pytorch/ecg_pytorch/gan_models/tensorboard/' \
 #
 VGAN_N_CHK = base_path + 'ecg_pytorch/ecg_pytorch/gan_models/tensorboard/ecg_vanilla_gan_N_beat/checkpoint_epoch_1_iters_1400'
 
-VGAN_S_CHK = base_path + 'ecg_pytorch/ecg_pytorch/gan_models/tensorboard/ecg_vanilla_gan_S_beat/checkpoint_epoch_55_iters_1000'
+VGAN_S_CHK = base_path + 'ecg_pytorch/ecg_pytorch/gan_models/tensorboard/ecg_vanilla_gan_s_beat/checkpoint_epoch_94_iters_1800'
 
-VGAN_V_CHK = base_path + 'ecg_pytorch/ecg_pytorch/gan_models/tensorboard/ecg_vanilla_gan_V_beat/checkpoint_epoch_16_iters_1200'
+VGAN_V_CHK = base_path + 'ecg_pytorch/ecg_pytorch/gan_models/tensorboard/ecg_vanilla_gan_V_beat/checkpoint_epoch_21_iters_1600'
 
 VGAN_F_CHK = base_path + 'ecg_pytorch/ecg_pytorch/gan_models/tensorboard/ecg_vanilla_gan_F_beat/checkpoint_epoch_177_iters_1600'
 

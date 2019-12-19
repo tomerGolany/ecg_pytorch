@@ -35,8 +35,8 @@ def build(train_config,):
         init_auc_scores = [0, 0]
     else:
         init_auc_scores = [0, 0, 0, 0]
-        dataset = EcgHearBeatsDataset(transform=composed)
-        testset = EcgHearBeatsDatasetTest(transform=composed)
+        dataset = EcgHearBeatsDataset(transform=composed, lstm_setting=False)
+        testset = EcgHearBeatsDatasetTest(transform=composed, lstm_setting=False)
 
     testdataloader = torch.utils.data.DataLoader(testset, batch_size=300,
                                                  shuffle=True, num_workers=1)
@@ -62,27 +62,27 @@ def build(train_config,):
                 dataset.add_beats_from_generator(gNet, num_examples_to_add,
                                                  generator_checkpoint_path,
                                                  generator_beat_type)
-            elif gan_type == 'ODE_GAN':
+            elif gan_type == GanType.ODE_GAN:
                 gNet = ode_gan_aaai.DCGenerator(0)
                 dataset.add_beats_from_generator(gNet, num_examples_to_add,
                                                  generator_checkpoint_path,
                                                  generator_beat_type)
-            elif gan_type == 'SIMULATOR':
+            elif gan_type == GanType.SIMULATOR:
                 dataset.add_beats_from_simulator(num_examples_to_add, generator_beat_type)
 
-            elif gan_type == 'VANILA_GAN':
+            elif gan_type == GanType.VANILA_GAN:
                 gNet = vanila_gan.VGenerator(0)
                 dataset.add_beats_from_generator(gNet, num_examples_to_add,
                                                  generator_checkpoint_path,
                                                  generator_beat_type)
 
-            elif gan_type == 'VANILA_GAN_ODE':
+            elif gan_type == GanType.VANILA_GAN_ODE:
                 gNet = vanila_gan.VGenerator(0)
                 dataset.add_beats_from_generator(gNet, num_examples_to_add,
                                                  generator_checkpoint_path,
                                                  generator_beat_type)
 
-            elif gan_type == 'NOISE':
+            elif gan_type == GanType.NOISE:
                 dataset.add_noise(num_examples_to_add, generator_beat_type)
 
             else:
@@ -90,7 +90,15 @@ def build(train_config,):
 
         logging.info("Size of training data after additional data from GAN: {}".format(len(dataset)))
         logging.info("#N: {}\t #S: {}\t #V: {}\t #F: {}\t".format(dataset.len_beat('N'), dataset.len_beat('S'),
+                                                                dataset.len_beat('V'), dataset.len_beat('F')))
+    
+    else:
+        logging.info("No data is added. Train set size: ")
+        logging.info("#N: {}\t #S: {}\t #V: {}\t #F: {}\t".format(dataset.len_beat('N'), dataset.len_beat('S'),
                                                                   dataset.len_beat('V'), dataset.len_beat('F')))
+        logging.info("test set size: ")
+        logging.info("#N: {}\t #S: {}\t #V: {}\t #F: {}\t".format(testset.len_beat('N'), testset.len_beat('S'),
+                                                                  testset.len_beat('V'), testset.len_beat('F')))
 
     if train_config.weighted_sampling:
         weights_for_balance = dataset.make_weights_for_balanced_classes()

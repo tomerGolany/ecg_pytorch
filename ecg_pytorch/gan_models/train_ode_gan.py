@@ -5,7 +5,7 @@ import torch.utils.data
 import torchvision.transforms as transforms
 import numpy as np
 import matplotlib.pyplot as plt
-from ecg_pytorch.data_reader import ecg_dataset
+from ecg_pytorch.data_reader import ecg_dataset_lstm
 from tensorboardX import SummaryWriter
 from ecg_pytorch.gan_models.models import ode_gan
 from ecg_pytorch.gan_models.models import ode_gan_aaai
@@ -204,8 +204,7 @@ def euler_loss(hb_batch, params_batch, x_batch, y_batch, ode_params):
 
 def train(batch_size, num_train_steps, model_dir, beat_type):
 
-    device = torch.device("cuda:6" if torch.cuda.is_available() else "cpu")
-    # device = 'cpu'
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     ode_params = ODEParams(device)
 
     #
@@ -216,8 +215,8 @@ def train(batch_size, num_train_steps, model_dir, beat_type):
     #
     # 1. create the ECG dataset:
     #
-    composed = transforms.Compose([ecg_dataset.Scale(), ecg_dataset.ToTensor()])
-    dataset = ecg_dataset.EcgHearBeatsDataset(transform=composed, beat_type=beat_type)
+    composed = transforms.Compose([ecg_dataset_lstm.Scale(), ecg_dataset_lstm.ToTensor()])
+    dataset = ecg_dataset_lstm.EcgHearBeatsDataset(transform=composed, beat_type=beat_type, lstm_setting=False)
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size,
                                              shuffle=True, num_workers=1)
     print("Size of real dataset is {}".format(len(dataset)))
@@ -225,12 +224,12 @@ def train(batch_size, num_train_steps, model_dir, beat_type):
     #
     # 2. Create the models:
 
-    netG = ode_gan_aaai.DCGenerator(0).to(device)
-    netD = ode_gan_aaai.DCDiscriminator(0).to(device)
-    netD.apply(weights_init)
-    netG.apply(weights_init)
-    # netG = vanila_gan.VGenerator(0).to(device)
-    # netD = vanila_gan.VDiscriminator(0).to(device)
+    # netG = ode_gan_aaai.DCGenerator(0).to(device)
+    # netD = ode_gan_aaai.DCDiscriminator(0).to(device)
+    # netD.apply(weights_init)
+    # netG.apply(weights_init)
+    netG = vanila_gan.VGenerator(0).to(device)
+    netD = vanila_gan.VDiscriminator(0).to(device)
 
     #
     # Define loss functions:
@@ -405,6 +404,6 @@ def get_gradient_norm_l2(model):
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    model_dir = 'tensorboard/ecg_ode_gan_N_beat/'
-    beat_type = 'N'
+    model_dir = 'tensorboard/ecg_vanila_ode_gan_S_beat/'
+    beat_type = 'S'
     train(150, 5000, model_dir, beat_type)

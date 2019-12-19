@@ -5,7 +5,9 @@ from matplotlib import pyplot as plt
 from bokeh.io import output_file, show
 from bokeh.layouts import row
 from bokeh.plotting import figure
-DATA_DIR = '/Users/tomer.golany/PycharmProjects/ecg_dl/ecg_dl/Data/text_files/'
+from ecg_pytorch import train_configs
+
+DATA_DIR = train_configs.base + 'ecg_pytorch/ecg_pytorch/data_reader/text_files/'
 
 train_set = [101, 106, 108, 109, 112, 114, 115, 116, 118, 119, 122, 124, 201, 203, 205, 207, 208, 209, 215, 220,
                  223, 230]  # DS1
@@ -126,10 +128,17 @@ def beats_from_patient(patient_number):
         heart_beats_dict['patient_number'] = patient_number
         heart_beats_dict['cardiac_cycle'] = heart_beat
         heart_beats_dict['label'] = convert_tag_to_aami_class_ind(tags[ind])  # index label.
+        heart_beats_dict['label'] = convert_to_one_hot(heart_beats_dict['label'])
         heart_beats_dict['beat_type'] = convert_tag_to_aami_class_str(tags[ind])  # str label
         heart_beats_dict['beat_ind'] = ind
         heart_beats.append(heart_beats_dict)
     return heart_beats
+
+
+def convert_to_one_hot(ind):
+    res = [0 for _ in range(5)]
+    res[ind] = 1
+    return res
 
 
 if __name__ == "__main__":
