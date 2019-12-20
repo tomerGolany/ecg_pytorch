@@ -1,7 +1,7 @@
 import torch
 import cv2
 from matplotlib import pyplot as plt
-from ecg_pytorch.data_reader import data_from_speicifc_patients
+from ecg_pytorch.data_reader import patient
 from ecg_pytorch.classifiers.models import fully_connected
 from ecg_pytorch.classifiers.models import cnn
 import logging
@@ -29,7 +29,7 @@ test_set = [str(x) for x in test_set]
 
 def eval_model(model, model_chk, patient_number):
 
-    p_data = data_from_speicifc_patients.beats_from_patient(patient_number)
+    p_data = patient.beats_from_patient(patient_number)
 
     checkpoint = torch.load(model_chk, map_location='cpu')
     model.load_state_dict(checkpoint['net'])

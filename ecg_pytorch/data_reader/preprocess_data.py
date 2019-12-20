@@ -1,6 +1,6 @@
 """Preprocessing the MIT-BIH dataset"""
 from ecg_pytorch import train_configs
-from ecg_pytorch.data_reader import data_from_speicifc_patients
+from ecg_pytorch.data_reader import patient
 import logging
 
 DATA_DIR = train_configs.base + 'ecg_pytorch/ecg_pytorch/data_reader/text_files/'
@@ -16,12 +16,12 @@ test_set = [str(x) for x in test_set]
 def build_dataset():
     train_beats = []
     for p in train_set:
-        heart_beats_single_patient = data_from_speicifc_patients.beats_from_patient(p)
+        heart_beats_single_patient = patient.beats_from_patient(p)
         train_beats += heart_beats_single_patient
 
     test_beats = []
     for p in test_set:
-        heart_beats_single_patient = data_from_speicifc_patients.beats_from_patient(p)
+        heart_beats_single_patient = patient.beats_from_patient(p)
         test_beats += heart_beats_single_patient
 
     return train_beats, test_beats
