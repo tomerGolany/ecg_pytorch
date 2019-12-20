@@ -7,11 +7,12 @@ import logging
 # from bokeh.plotting import figure
 from ecg_pytorch import train_configs
 from ecg_pytorch.data_reader import heartbeat_types
+import wfdb
 
 DATA_DIR = train_configs.base + 'ecg_pytorch/ecg_pytorch/data_reader/text_files/'
 
 train_set = [101, 106, 108, 109, 112, 114, 115, 116, 118, 119, 122, 124, 201, 203, 205, 207, 208, 209, 215, 220,
-                 223, 230]  # DS1
+             223, 230]  # DS1
 train_set = [str(x) for x in train_set]
 test_set = [100, 103, 105, 111, 113, 117, 121, 123, 200, 202, 210, 212, 213, 214, 219, 221, 222, 228, 231, 232,
             233, 234]  # DS2
@@ -25,16 +26,19 @@ class Patient(object):
 
 
     """
+
     def __init__(self, patient_number):
         """Init Patient object from corresponding text file.
 
         :param patient_number: string which represents the patient number.
         """
         self.patient_number = patient_number
-        self.time, self.voltage1, self.voltage2, self.tags_time, self.tags, self.r_peaks_indexes = \
-            self.read_raw_data()
+        self.signals, self.additional_fields = self.get_raw_signals()
+        self.mit_bih_labels_str, self.labels_locations, self.labels_descriptions = self.get_annotations()
         self.heartbeats = self.slice_heartbeats()
 
+
+    @DeprecationWarning
     def read_raw_data(self):
         """Read patient's data file.
 
@@ -67,16 +71,54 @@ class Patient(object):
                 r_peaks_indexes.append(int(line[1]))
         return time, voltage1, voltage2, tags_time, tags, r_peaks_indexes
 
+    def get_raw_signals(self):
+        """Get raw signal using the wfdb package.
+
+        :return: signals : numpy array
+                    A 2d numpy array storing the physical signals from the record.
+                fields : dict
+                    A dictionary containing several key attributes of the read
+                    record:
+                      - fs: The sampling frequency of the record
+                      - units: The units for each channel
+                      - sig_name: The signal name for each channel
+                      - comments: Any comments written in the header
+        """
+        signals, fields = wfdb.rdsamp(self.patient_number, pb_dir='mitdb', warn_empty=True)
+        logging.info("Patient {} additional info: {}".format(self.patient_number, fields))
+        return signals, fields
+
+    def get_annotations(self):
+        """Get signal annotation using the wfdb package.
+
+        :return:
+        """
+        ann = wfdb.rdann(self.patient_number, 'atr', pb_dir='mitdb', return_label_elements=['symbol', 'label_store',
+                                                                                            'description'],
+                         summarize_labels=True)
+
+        mit_bih_labels_str = ann.symbol
+
+        labels_locations = ann.sample
+
+        labels_description = ann.description
+
+        return mit_bih_labels_str, labels_locations, labels_description
+
     def slice_heartbeats(self):
         """Slice heartbeats from the raw signal.
 
         :return:
         """
-        sampling_rate = 360  # 360 samples per second
+        sampling_rate = self.additional_fields['fs']  # 360 samples per second
+        logging.info("Sampling rate: {}".format(sampling_rate))
+        assert sampling_rate == 360
         before = 0.2  # 0.2 seconds == 0.2 * 10^3 miliseconds == 200 ms
         after = 0.4  # --> 400 ms
-        ecg_signal = np.array(self.voltage1)
-        r_peak_locations = np.array(self.r_peaks_indexes)
+        lead = self.additional_fields['sig_name'][0]
+        assert lead == 'MLII'
+        ecg_signal = self.signals[0]
+        r_peak_locations = np.array(self.labels_locations)
 
         # convert seconds to samples
         before = int(before * sampling_rate)  # Number of samples per 200 ms.
@@ -99,9 +141,9 @@ class Patient(object):
             heart_beat = np.array(ecg_signal[start:end])
             heart_beats_dict['patient_number'] = self.patient_number
             heart_beats_dict['cardiac_cycle'] = heart_beat
-            aami_label_str = heartbeat_types.convert_heartbeat_mit_bih_to_aami(self.tags[ind])
-            aami_label_ind = heartbeat_types.convert_heartbeat_mit_bih_to_aami_index_class(self.tags[ind])
-            heart_beats_dict['mit_bih_label_str'] = self.tags[ind]
+            aami_label_str = heartbeat_types.convert_heartbeat_mit_bih_to_aami(self.mit_bih_labels_str[ind])
+            aami_label_ind = heartbeat_types.convert_heartbeat_mit_bih_to_aami_index_class(self.mit_bih_labels_str[ind])
+            heart_beats_dict['mit_bih_label_str'] = self.mit_bih_labels_str[ind]
             heart_beats_dict['aami_label_str'] = aami_label_str
             heart_beats_dict['aami_label_ind'] = aami_label_ind
             heart_beats_dict['aami_label_one_hot'] = heartbeat_types.convert_to_one_hot(aami_label_ind)
@@ -128,15 +170,12 @@ class Patient(object):
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    # p_100 = Patient('101')
+    p_100 = Patient('234')
     # heartbeats = p_100.heartbeats
     #
     # logging.info("Total number of heartbeats: {}\t #N: {}\t #S: {}\t, #V: {}, #F: {}\t #Q: {}"
     #              .format(len(heartbeats), p_100.num_heartbeats('N'), p_100.num_heartbeats('S'), p_100.num_heartbeats('V'),
     #                      p_100.num_heartbeats('F'), p_100.num_heartbeats('Q')))
-
-    # import wfdb
-
 
     # time = list(range(216))
     # for i in range(100):
@@ -144,5 +183,5 @@ if __name__ == "__main__":
     #     p.line(time, N_b[i], line_width=2, line_color="green")
     #     output_file("N_{}_real.html".format(i))
     #     show(p)
-        # plt.plot(N_b[i])
-        # plt.show()
+    # plt.plot(N_b[i])
+    # plt.show()
