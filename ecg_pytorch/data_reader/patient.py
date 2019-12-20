@@ -8,6 +8,7 @@ import logging
 from ecg_pytorch import train_configs
 from ecg_pytorch.data_reader import heartbeat_types
 import wfdb
+import pandas as pd
 
 DATA_DIR = train_configs.base + 'ecg_pytorch/ecg_pytorch/data_reader/text_files/'
 
@@ -36,6 +37,8 @@ class Patient(object):
         self.signals, self.additional_fields = self.get_raw_signals()
         self.mit_bih_labels_str, self.labels_locations, self.labels_descriptions = self.get_annotations()
         self.heartbeats = self.slice_heartbeats()
+
+        self.summary_dict = self.create_summaries()
 
 
     @DeprecationWarning
@@ -117,8 +120,8 @@ class Patient(object):
         after = 0.4  # --> 400 ms
         lead = self.additional_fields['sig_name'][0]
         assert lead == 'MLII'
-        ecg_signal = self.signals[0]
-        r_peak_locations = np.array(self.labels_locations)
+        ecg_signal = self.signals[:, 0]
+        r_peak_locations = self.labels_locations
 
         # convert seconds to samples
         before = int(before * sampling_rate)  # Number of samples per 200 ms.
@@ -148,6 +151,7 @@ class Patient(object):
             heart_beats_dict['aami_label_ind'] = aami_label_ind
             heart_beats_dict['aami_label_one_hot'] = heartbeat_types.convert_to_one_hot(aami_label_ind)
             heart_beats_dict['beat_ind'] = ind
+            heart_beats_dict['lead'] = lead
             heart_beats.append(heart_beats_dict)
         return heart_beats
 
@@ -167,10 +171,29 @@ class Patient(object):
         """
         return len(self.get_heartbeats_of_type(aami_label_str))
 
+    def create_summaries(self):
+        """Create summaries:
+
+
+        :return:
+        """
+        pass
+
+    def get_patient_df(self):
+        """Get data frame with patient details per heartbeat.
+
+        :return: pandas dataframe.
+        """
+        df = pd.DataFrame(self.heartbeats)
+        print(df)
+
+
+
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     p_100 = Patient('234')
+    p_100.get_patient_df()
     # heartbeats = p_100.heartbeats
     #
     # logging.info("Total number of heartbeats: {}\t #N: {}\t #S: {}\t, #V: {}, #F: {}\t #Q: {}"
