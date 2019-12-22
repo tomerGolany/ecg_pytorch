@@ -223,6 +223,12 @@ def model_fn(network_object, model_dir, train_config=None):
         metrics.plt_precision_recall_bokeh(labels_total_one_hot, outputs_preds, label_names, model_dir, epoch)
 
     writer.close()
+
+    torch.save({
+        'net': net.state_dict()
+    }, model_dir + '/checkpoint_epoch_iters_{}'.format(total_iters))
+    writer.close()
+
     return best_auc_scores
 
 
@@ -427,7 +433,7 @@ def train_with_noise():
 
 
 if __name__ == "__main__":
-    model_dir = base_path + 'ecg_pytorch/ecg_pytorch/classifiers/tensorboard/s_resnet_raw_v2/vgan_500/'
+    model_dir = base_path + 'ecg_pytorch/ecg_pytorch/classifiers/tensorboard/s_resnet_raw_v2/vgan_1000/'
     if os.path.exists(model_dir):
         print("Model dir {} already exists! exiting...".format(model_dir))
         exit()
@@ -446,7 +452,7 @@ if __name__ == "__main__":
     net = deep_residual_conv.Net(2).to(device)
 
     gen_details = GeneratorAdditionalDataConfig(beat_type='S', checkpoint_path=checkpoint_paths.VGAN_S_CHK,
-                                                num_examples_to_add=500, gan_type=dataset_builder.GanType.VANILA_GAN)
+                                                num_examples_to_add=1000, gan_type=dataset_builder.GanType.VANILA_GAN)
 
     train_config_1 = ECGTrainConfig(num_epochs=15, batch_size=300, lr=0.0001, weighted_loss=False,
                                     weighted_sampling=False,

@@ -8,6 +8,8 @@ import logging
 import numpy as np
 import tqdm
 from ecg_pytorch.classifiers.inference import checkpoint_paths
+from ecg_pytorch.classifiers.models import deep_residual_conv
+import pandas as pd
 
 CLASS_TO_IND = {'N': 0, 'S': 1, 'V': 2, 'F': 3, 'Q': 4}
 IND_TO_CLASS = {0: 'N', 1: 'S', 2: 'V', 3: 'F', 4: 'Q'}
@@ -84,8 +86,72 @@ def eval_model(model, model_chk, patient_number):
         out.release()
 
 
+def inference_one_vs_all(beat_type, model, model_chk, patient_number):
+    """Returns probability predictions from an ECG signal of a patient.
+
+    :param beat_type: The the of beat which is classified.
+    :param model: The network object without the loaded weights.
+    :param model_chk: path to checkpoint file with weight values.
+    :param patient_number: string - number of patient from the mit-bih dataset.
+    :return:
+    """
+    logging.info("Inference model {} Vs. all".format(beat_type))
+    p = patient.Patient(patient_number)
+
+    heartbeats = p.heartbeats
+
+    checkpoint = torch.load(model_chk, map_location='cpu')
+    model.load_state_dict(checkpoint['net'])
+    model.eval()
+    softmax = torch.nn.Softmax()
+    predictions = []
+    ground_truths = []
+    with torch.no_grad():
+        for i, beat_dict in enumerate(tqdm.tqdm(heartbeats)):
+            logging.info("beat # {}".format(beat_dict['beat_ind']))
+            beat = torch.Tensor(beat_dict['cardiac_cycle'])
+
+            prediction = model(beat)
+            prediction = softmax(prediction)
+            prediction = prediction.numpy()
+            logging.info("prediction: {}\t ground truth: {}".format(prediction, beat_dict['aami_label_str']))
+            predictions.append([prediction[0][0], prediction[0][1]])
+
+            if beat_dict['aami_label_str'] == beat_type:
+                ground_truths.append([1, 0])
+            else:
+                ground_truths.append([0, 1])
+
+    return predictions, ground_truths
+
+
+def predictions_ground_truths_data_frame(beat_type, model, model_chk, patient_number):
+    """Returns pandas dataframe of probability predictions from an ECG signal of a patient.
+
+    :param beat_type: The the of beat which is classified.
+    :param model: The network object without the loaded weights.
+    :param model_chk: path to checkpoint file with weight values.
+    :param patient_number: string - number of patient from the mit-bih dataset.
+    :return:
+    """
+    predictions, ground_truths = inference_one_vs_all(beat_type, model, model_chk, patient_number)
+    df = pd.DataFrame(list(zip(predictions, ground_truths)), columns=['Predictions', 'Ground Truth'])
+    return df
+
+
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.WARNING)
-    ff = fully_connected.FF()
-    model_chk = checkpoint_paths.FF_CHECKPOINT_PATH
-    eval_model(ff, model_chk, patient_number='117')
+    logging.basicConfig(level=logging.INFO)
+    # ff = fully_connected.FF()
+    # model_chk = checkpoint_paths.FF_CHECKPOINT_PATH
+    # eval_model(ff, model_chk, patient_number='117')
+    model_chk = '/Users/tomer.golany/PycharmProjects/ecg_pytorch/ecg_pytorch/classifiers/tensorboard/s_resnet_raw_v2/vgan_1000/checkpoint_epoch_iters_2685'
+    net = deep_residual_conv.Net(2)
+    p = '100'
+    # preds, gts = inference_one_vs_all('S', net, model_chk, p)
+    # preds = np.array(preds)
+    # gts = np.array(gts)
+    # print(preds.shape)
+    # print(gts.shape)
+
+    pred_gts_df = predictions_ground_truths_data_frame('S', net, model_chk, p)
+    print(pred_gts_df)

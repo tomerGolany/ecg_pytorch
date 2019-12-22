@@ -2,18 +2,8 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="2ac63e5a-436e-4015-8762-638a068d6d04" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/ecg_pytorch/classifiers/model_lib.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/ecg_pytorch/data_reader/ecg_mit_bih.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/ecg_pytorch/data_reader/ecg_mit_bih_test.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/ecg_pytorch.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/ecg_pytorch.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ecg_pytorch/classifiers/inference/run_inference.py" beforeDir="false" afterPath="$PROJECT_DIR$/ecg_pytorch/classifiers/inference/run_inference.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/ecg_pytorch/classifiers/run_sequence_model.py" beforeDir="false" afterPath="$PROJECT_DIR$/ecg_pytorch/classifiers/run_sequence_model.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ecg_pytorch/data_reader/ecg_dataset_lstm.py" beforeDir="false" afterPath="$PROJECT_DIR$/ecg_pytorch/data_reader/ecg_dataset_lstm.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ecg_pytorch/data_reader/patient.py" beforeDir="false" afterPath="$PROJECT_DIR$/ecg_pytorch/data_reader/patient.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ecg_pytorch/data_reader/pickle_data.py" beforeDir="false" afterPath="$PROJECT_DIR$/ecg_pytorch/data_reader/pickle_data.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ecg_pytorch/data_reader/preprocess_data.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/ecg_pytorch/gan_models/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/ecg_pytorch/gan_models/main.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ecg_pytorch/train_configs.py" beforeDir="false" afterPath="$PROJECT_DIR$/ecg_pytorch/train_configs.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -30,7 +20,7 @@
     <SUITE FILE_PATH="coverage/ecg_pytorch$ode_combined_conv_gan.coverage" NAME="ode_combined_conv_gan Coverage Results" MODIFIED="1562364076787" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/ecg_pytorch/gan_models/models" />
     <SUITE FILE_PATH="coverage/ecg_pytorch$wcg_mit_bih_test.coverage" NAME="wcg_mit_bih_test Coverage Results" MODIFIED="1576999745177" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/ecg_pytorch/data_reader" />
     <SUITE FILE_PATH="coverage/ecg_pytorch$metrics_test.coverage" NAME="metrics_test Coverage Results" MODIFIED="1576267118975" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/ecg_pytorch/classifiers" />
-    <SUITE FILE_PATH="coverage/ecg_pytorch$run_inference.coverage" NAME="run_inference Coverage Results" MODIFIED="1563093733675" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/ecg_pytorch/classifiers/inference" />
+    <SUITE FILE_PATH="coverage/ecg_pytorch$run_inference.coverage" NAME="run_inference Coverage Results" MODIFIED="1577050261292" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/ecg_pytorch/classifiers/inference" />
     <SUITE FILE_PATH="coverage/ecg_pytorch$smooth_signal.coverage" NAME="smooth_signal Coverage Results" MODIFIED="1567279434030" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/ecg_pytorch/data_reader" />
     <SUITE FILE_PATH="coverage/ecg_pytorch$main__1_.coverage" NAME="main (1) Coverage Results" MODIFIED="1563282219933" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/ecg_pytorch/dynamical_model/learn_params" />
     <SUITE FILE_PATH="coverage/ecg_pytorch$compare_models.coverage" NAME="compare_models Coverage Results" MODIFIED="1567616884291" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/ecg_pytorch/classifiers" />
@@ -54,10 +44,22 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/ecg_pytorch/classifiers/run_sequence_model.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="253">
-              <caret line="436" column="93" selection-start-line="436" selection-start-column="93" selection-end-line="436" selection-end-column="93" />
+            <state relative-caret-position="459">
+              <caret line="451" column="46" lean-forward="true" selection-start-line="451" selection-start-column="3" selection-end-line="451" selection-end-column="46" />
               <folding>
                 <element signature="e#0#12#0" expanded="true" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/ecg_pytorch/classifiers/main.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="209">
+              <caret line="232" column="14" selection-start-line="232" selection-start-column="10" selection-end-line="232" selection-end-column="14" />
+              <folding>
+                <element signature="e#0#43#0" expanded="true" />
               </folding>
             </state>
           </provider>
@@ -66,8 +68,8 @@
       <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/ecg_pytorch/classifiers/inference/run_inference.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="546">
-              <caret line="42" column="57" lean-forward="true" selection-start-line="42" selection-start-column="57" selection-end-line="42" selection-end-column="57" />
+            <state relative-caret-position="605">
+              <caret line="153" column="22" lean-forward="true" selection-start-line="153" selection-start-column="22" selection-end-line="153" selection-end-column="22" />
               <folding>
                 <element signature="e#0#12#0" expanded="true" />
               </folding>
@@ -83,20 +85,11 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/ecg_pytorch/data_reader/patient.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="416">
-              <caret line="157" column="48" selection-start-line="157" selection-start-column="30" selection-end-line="157" selection-end-column="48" />
+            <state relative-caret-position="470">
+              <caret line="158" column="46" selection-start-line="158" selection-start-column="46" selection-end-line="158" selection-end-column="46" />
               <folding>
                 <element signature="e#0#18#0" expanded="true" />
               </folding>
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/ecg_pytorch/gan_models/checkpoint_paths.py">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="404">
-              <caret line="48" column="44" selection-start-line="48" selection-start-column="44" selection-end-line="48" selection-end-column="44" />
             </state>
           </provider>
         </entry>
@@ -128,8 +121,8 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/ecg_pytorch/data_reader/ecg_dataset_lstm.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="472">
-              <caret line="218" column="24" selection-start-line="218" selection-start-column="24" selection-end-line="218" selection-end-column="24" />
+            <state relative-caret-position="381">
+              <caret line="202" column="98" lean-forward="true" selection-start-line="199" selection-start-column="12" selection-end-line="202" selection-end-column="98" />
               <folding>
                 <element signature="e#0#36#0" expanded="true" />
               </folding>
@@ -170,7 +163,6 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>beat</find>
       <find>print</find>
       <find>base</find>
       <find>writer</find>
@@ -195,11 +187,12 @@
       <find>torch.device</find>
       <find>labels sh</find>
       <find>create_summaries</find>
-      <find>aami_label_str</find>
       <find>roc</find>
       <find>write_s</find>
       <find>cross_entropy_loss</find>
       <find>predict_fn</find>
+      <find>save</find>
+      <find>aami_label_str</find>
     </findStrings>
   </component>
   <component name="Git.Settings">
@@ -217,7 +210,6 @@
         <option value="$PROJECT_DIR$/ecg_pytorch/gan_models/models/dcgan.py" />
         <option value="$PROJECT_DIR$/ecg_pytorch/classifiers/inference/checkpoint_paths.py" />
         <option value="$PROJECT_DIR$/ecg_pytorch/gan_models/models/ode_gan_aaai.py" />
-        <option value="$PROJECT_DIR$/ecg_pytorch/classifiers/inference/run_inference.py" />
         <option value="$PROJECT_DIR$/ecg_pytorch/dynamical_model/Euler/typical_beat_params.py" />
         <option value="$PROJECT_DIR$/ecg_pytorch/dynamical_model/Euler/euler.py" />
         <option value="$PROJECT_DIR$/ecg_pytorch/dynamical_model/Euler/single_step.py" />
@@ -255,10 +247,11 @@
         <option value="$PROJECT_DIR$/ecg_pytorch/gan_models/checkpoint_paths.py" />
         <option value="$PROJECT_DIR$/ecg_pytorch/data_reader/pickle_data.py" />
         <option value="$PROJECT_DIR$/ecg_pytorch/train_configs.py" />
-        <option value="$PROJECT_DIR$/ecg_pytorch/data_reader/patient.py" />
         <option value="$PROJECT_DIR$/ecg_pytorch/data_reader/wcg_mit_bih_test.py" />
         <option value="$PROJECT_DIR$/ecg_pytorch/data_reader/ecg_dataset_lstm.py" />
         <option value="$PROJECT_DIR$/ecg_pytorch/classifiers/run_sequence_model.py" />
+        <option value="$PROJECT_DIR$/ecg_pytorch/data_reader/patient.py" />
+        <option value="$PROJECT_DIR$/ecg_pytorch/classifiers/inference/run_inference.py" />
       </list>
     </option>
   </component>
@@ -285,6 +278,43 @@
               <item name="ecg_pytorch" type="b2602c69:ProjectViewProjectNode" />
               <item name="ecg_pytorch" type="462c0819:PsiDirectoryNode" />
               <item name="ecg_pytorch" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="ecg_pytorch" type="b2602c69:ProjectViewProjectNode" />
+              <item name="ecg_pytorch" type="462c0819:PsiDirectoryNode" />
+              <item name="ecg_pytorch" type="462c0819:PsiDirectoryNode" />
+              <item name="classifiers" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="ecg_pytorch" type="b2602c69:ProjectViewProjectNode" />
+              <item name="ecg_pytorch" type="462c0819:PsiDirectoryNode" />
+              <item name="ecg_pytorch" type="462c0819:PsiDirectoryNode" />
+              <item name="classifiers" type="462c0819:PsiDirectoryNode" />
+              <item name="inference" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="ecg_pytorch" type="b2602c69:ProjectViewProjectNode" />
+              <item name="ecg_pytorch" type="462c0819:PsiDirectoryNode" />
+              <item name="ecg_pytorch" type="462c0819:PsiDirectoryNode" />
+              <item name="classifiers" type="462c0819:PsiDirectoryNode" />
+              <item name="tensorboard" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="ecg_pytorch" type="b2602c69:ProjectViewProjectNode" />
+              <item name="ecg_pytorch" type="462c0819:PsiDirectoryNode" />
+              <item name="ecg_pytorch" type="462c0819:PsiDirectoryNode" />
+              <item name="classifiers" type="462c0819:PsiDirectoryNode" />
+              <item name="tensorboard" type="462c0819:PsiDirectoryNode" />
+              <item name="s_resnet_raw_v2" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="ecg_pytorch" type="b2602c69:ProjectViewProjectNode" />
+              <item name="ecg_pytorch" type="462c0819:PsiDirectoryNode" />
+              <item name="ecg_pytorch" type="462c0819:PsiDirectoryNode" />
+              <item name="classifiers" type="462c0819:PsiDirectoryNode" />
+              <item name="tensorboard" type="462c0819:PsiDirectoryNode" />
+              <item name="s_resnet_raw_v2" type="462c0819:PsiDirectoryNode" />
+              <item name="vgan_1000" type="462c0819:PsiDirectoryNode" />
             </path>
           </expand>
           <select />
@@ -323,7 +353,7 @@
       </list>
     </option>
   </component>
-  <component name="RunManager" selected="Python.wcg_mit_bih_test">
+  <component name="RunManager" selected="Python.run_inference">
     <configuration name="ecg_dataset_lstm" type="PythonConfigurationType" factoryName="Python" temporary="true">
       <module name="ecg_pytorch" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -390,7 +420,7 @@
       <option name="INPUT_FILE" value="" />
       <method v="2" />
     </configuration>
-    <configuration name="test_equations" type="PythonConfigurationType" factoryName="Python" temporary="true">
+    <configuration name="run_inference" type="PythonConfigurationType" factoryName="Python" temporary="true">
       <module name="ecg_pytorch" />
       <option name="INTERPRETER_OPTIONS" value="" />
       <option name="PARENT_ENVS" value="true" />
@@ -398,12 +428,12 @@
         <env name="PYTHONUNBUFFERED" value="1" />
       </envs>
       <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/ecg_pytorch/dynamical_model" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/ecg_pytorch/classifiers/inference" />
       <option name="IS_MODULE_SDK" value="true" />
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/ecg_pytorch/dynamical_model/test_equations.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/ecg_pytorch/classifiers/inference/run_inference.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
@@ -436,11 +466,11 @@
     </configuration>
     <recent_temporary>
       <list>
+        <item itemvalue="Python.run_inference" />
         <item itemvalue="Python.wcg_mit_bih_test" />
         <item itemvalue="Python.ecg_dataset_lstm" />
         <item itemvalue="Python.preprocess_data" />
         <item itemvalue="Python.patient" />
-        <item itemvalue="Python.test_equations" />
       </list>
     </recent_temporary>
   </component>
@@ -466,12 +496,12 @@
       <workItem from="1576062766822" duration="50512000" />
       <workItem from="1576678775956" duration="869000" />
       <workItem from="1576680916531" duration="3502000" />
-      <workItem from="1576760664977" duration="20488000" />
+      <workItem from="1576760664977" duration="24189000" />
     </task>
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="471731000" />
+    <option name="totallyTimeSpent" value="475432000" />
   </component>
   <component name="TodoView">
     <todo-panel id="selected-file">
@@ -485,14 +515,14 @@
   <component name="ToolWindowManager">
     <frame x="-1920" y="0" width="1920" height="1080" extended-state="6" />
     <layout>
-      <window_info active="true" content_ui="combo" id="Project" order="0" visible="true" weight="0.2539936" />
+      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.2539936" />
       <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
       <window_info id="Favorites" order="2" side_tool="true" />
-      <window_info anchor="bottom" id="File Transfer" order="0" visible="true" weight="0.28774062" />
+      <window_info anchor="bottom" id="File Transfer" order="0" weight="0.28774062" />
       <window_info anchor="bottom" id="Concurrent Activities Diagram" order="1" weight="0.3291536" />
       <window_info anchor="bottom" id="Message" order="2" />
       <window_info anchor="bottom" id="Find" order="3" weight="0.32826748" />
-      <window_info anchor="bottom" id="Run" order="4" sideWeight="0.49627262" weight="0.21580547" />
+      <window_info active="true" anchor="bottom" id="Run" order="4" sideWeight="0.49627262" visible="true" weight="0.24822696" />
       <window_info anchor="bottom" id="Cvs" order="5" weight="0.25" />
       <window_info anchor="bottom" id="Inspection" order="6" weight="0.4" />
       <window_info anchor="bottom" id="Debug" order="7" sideWeight="0.49946752" weight="0.3655514" />
@@ -554,7 +584,7 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/ecg_pytorch/classifiers/inference/run_inference.py</url>
-          <line>62</line>
+          <line>64</line>
           <option name="timeStamp" value="26" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
@@ -643,15 +673,6 @@
           <caret selection-end-line="1" selection-end-column="31" />
           <folding>
             <element signature="e#0#21#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/ecg_pytorch/classifiers/main.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-341">
-          <folding>
-            <element signature="e#0#43#0" expanded="true" />
           </folding>
         </state>
       </provider>
@@ -878,32 +899,12 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/ecg_pytorch/data_reader/patient.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="416">
-          <caret line="157" column="48" selection-start-line="157" selection-start-column="30" selection-end-line="157" selection-end-column="48" />
-          <folding>
-            <element signature="e#0#18#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/ecg_pytorch/data_reader/ecg_mit_bih.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="480">
           <caret line="32" column="30" selection-start-line="32" selection-start-column="8" selection-end-line="32" selection-end-column="30" />
           <folding>
             <element signature="e#40#77#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/ecg_pytorch/data_reader/ecg_dataset_lstm.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="472">
-          <caret line="218" column="24" selection-start-line="218" selection-start-column="24" selection-end-line="218" selection-end-column="24" />
-          <folding>
-            <element signature="e#0#36#0" expanded="true" />
           </folding>
         </state>
       </provider>
@@ -922,23 +923,53 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/ecg_pytorch/classifiers/inference/checkpoint_paths.py">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/ecg_pytorch/classifiers/main.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="209">
+          <caret line="232" column="14" selection-start-line="232" selection-start-column="10" selection-end-line="232" selection-end-column="14" />
+          <folding>
+            <element signature="e#0#43#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/ecg_pytorch/classifiers/run_sequence_model.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="253">
-          <caret line="436" column="93" selection-start-line="436" selection-start-column="93" selection-end-line="436" selection-end-column="93" />
+        <state relative-caret-position="459">
+          <caret line="451" column="46" lean-forward="true" selection-start-line="451" selection-start-column="3" selection-end-line="451" selection-end-column="46" />
           <folding>
             <element signature="e#0#12#0" expanded="true" />
           </folding>
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/ecg_pytorch/classifiers/inference/checkpoint_paths.py">
-      <provider selected="true" editor-type-id="text-editor" />
+    <entry file="file://$PROJECT_DIR$/ecg_pytorch/data_reader/patient.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="470">
+          <caret line="158" column="46" selection-start-line="158" selection-start-column="46" selection-end-line="158" selection-end-column="46" />
+          <folding>
+            <element signature="e#0#18#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/ecg_pytorch/data_reader/ecg_dataset_lstm.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="381">
+          <caret line="202" column="98" lean-forward="true" selection-start-line="199" selection-start-column="12" selection-end-line="202" selection-end-column="98" />
+          <folding>
+            <element signature="e#0#36#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/ecg_pytorch/classifiers/inference/run_inference.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="546">
-          <caret line="42" column="57" lean-forward="true" selection-start-line="42" selection-start-column="57" selection-end-line="42" selection-end-column="57" />
+        <state relative-caret-position="605">
+          <caret line="153" column="22" lean-forward="true" selection-start-line="153" selection-start-column="22" selection-end-line="153" selection-end-column="22" />
           <folding>
             <element signature="e#0#12#0" expanded="true" />
           </folding>
