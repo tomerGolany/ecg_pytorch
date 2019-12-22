@@ -95,6 +95,12 @@ def write_summaries(writer, train_config, labels_class, outputs_class, total_ite
                                             np.array([generator_beat_type, 'Other']),
                                             writer,
                                             total_iters)
+
+            metrics.plt_precision_recall_curve(labels_one_hot, output_probabilites,
+                                               np.array([generator_beat_type, 'Other']),
+                                               writer,
+                                               total_iters)
+
             for i_auc in range(2):
                 if auc_roc[i_auc] > best_auc_scores[i_auc]:
                     best_auc_scores[i_auc] = auc_roc[i_auc]
@@ -136,7 +142,6 @@ def model_fn(network_object, model_dir, train_config=None):
         label_names = np.array([train_config.generator_details.beat_type, 'Others'])
     else:
         label_names = np.array(['N', 'S', 'V', 'F', 'Q'])
-
 
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(network_object.parameters(), lr=lr)
@@ -199,14 +204,18 @@ def model_fn(network_object, model_dir, train_config=None):
 
                 logging.info("total output preds shape: {}. labels_total_one_hot shape: {}".format(outputs_preds.shape,
                                                                                                    labels_total_one_hot.shape))
-                write_summaries(writer, train_config, labels_ind_total, outputs_ind_total, total_iters, 'test',
-                                best_auc_scores,
-                                outputs_preds, labels_total_one_hot)
+                # write_summaries(writer, train_config, labels_ind_total, outputs_ind_total, total_iters, 'test',
+                #                 best_auc_scores,
+                #                 outputs_preds, labels_total_one_hot)
 
         labels_ind_total, outputs_ind_total, labels_total_one_hot, outputs_preds = predict_fn(test_data_loader,
                                                                                               train_config, criterion,
                                                                                               writer, total_iters,
                                                                                               best_auc_scores)
+
+        write_summaries(writer, train_config, labels_ind_total, outputs_ind_total, epoch, 'test',
+                        best_auc_scores,
+                        outputs_preds, labels_total_one_hot)
 
         metrics.add_roc_curve_bokeh(labels_total_one_hot, outputs_preds,
                                                 label_names, model_dir, epoch)
@@ -418,19 +427,26 @@ def train_with_noise():
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
+    model_dir = base_path + 'ecg_pytorch/ecg_pytorch/classifiers/tensorboard/s_resnet_raw_v2/vgan_500/'
+    if os.path.exists(model_dir):
+        print("Model dir {} already exists! exiting...".format(model_dir))
+        exit()
+    else:
+        os.makedirs(model_dir)
+
+    logging.basicConfig(level=logging.INFO, handlers=[logging.FileHandler("{}/logs.log".format(model_dir)),
+                                                      logging.StreamHandler()])
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     logging.info("Devices: {}".format(device))
-    model_dir = base_path + 'ecg_pytorch/ecg_pytorch/classifiers/tensorboard/s_resnet_raw/dcgan_10000/'
+
 
 
     # net = lstm.ECGLSTM(5, 512, 2, 2).to(device)
 
     net = deep_residual_conv.Net(2).to(device)
 
-
-    gen_details = GeneratorAdditionalDataConfig(beat_type='S', checkpoint_path=checkpoint_paths.DCGAN_S_CHK,
-                                                    num_examples_to_add=10000, gan_type=dataset_builder.GanType.DCGAN)
+    gen_details = GeneratorAdditionalDataConfig(beat_type='S', checkpoint_path=checkpoint_paths.VGAN_S_CHK,
+                                                num_examples_to_add=500, gan_type=dataset_builder.GanType.VANILA_GAN)
 
     train_config_1 = ECGTrainConfig(num_epochs=15, batch_size=300, lr=0.0001, weighted_loss=False,
                                     weighted_sampling=False,

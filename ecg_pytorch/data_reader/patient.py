@@ -38,9 +38,6 @@ class Patient(object):
         self.mit_bih_labels_str, self.labels_locations, self.labels_descriptions = self.get_annotations()
         self.heartbeats = self.slice_heartbeats()
 
-        self.summary_dict = self.create_summaries()
-
-
     @DeprecationWarning
     def read_raw_data(self):
         """Read patient's data file.
@@ -118,9 +115,18 @@ class Patient(object):
         assert sampling_rate == 360
         before = 0.2  # 0.2 seconds == 0.2 * 10^3 miliseconds == 200 ms
         after = 0.4  # --> 400 ms
-        lead = self.additional_fields['sig_name'][0]
-        assert lead == 'MLII'
-        ecg_signal = self.signals[:, 0]
+
+        #
+        # Find lead 2 position:
+        #
+        lead_pos = None
+        for i, lead in enumerate(self.additional_fields['sig_name']):
+            if lead == 'MLII':
+                lead_pos = i
+        if lead_pos is None:
+            raise AssertionError("Didn't find lead 2 position. LEADS: {}".format(self.additional_fields['sig_name']))
+        logging.info("LEAD 2 position: {}".format(lead_pos))
+        ecg_signal = self.signals[:, lead_pos]
         r_peak_locations = self.labels_locations
 
         # convert seconds to samples
@@ -151,7 +157,7 @@ class Patient(object):
             heart_beats_dict['aami_label_ind'] = aami_label_ind
             heart_beats_dict['aami_label_one_hot'] = heartbeat_types.convert_to_one_hot(aami_label_ind)
             heart_beats_dict['beat_ind'] = ind
-            heart_beats_dict['lead'] = lead
+            heart_beats_dict['lead'] = 'MLII'
             heart_beats.append(heart_beats_dict)
         return heart_beats
 
@@ -171,13 +177,24 @@ class Patient(object):
         """
         return len(self.get_heartbeats_of_type(aami_label_str))
 
-    def create_summaries(self):
+    def heartbeats_summaries(self):
         """Create summaries:
 
 
         :return:
         """
-        pass
+        heartbeat_summaries = []
+        for hb_aami in heartbeat_types.AAMIHeartBeatTypes:
+            hb_summary = {}
+            hb_summary['heartbeat_aami_str'] = hb_aami.name
+            num_hb = self.num_heartbeats(hb_aami.name)
+            hb_summary['number_of_beats'] = num_hb
+            heartbeat_summaries.append(hb_summary)
+        total_summary = {}
+        total_summary['heartbeat_aami_str'] = 'ALL'
+        total_summary['number_of_beats'] = len(self.heartbeats)
+        heartbeat_summaries.append(total_summary)
+        return pd.DataFrame(heartbeat_summaries)
 
     def get_patient_df(self):
         """Get data frame with patient details per heartbeat.
@@ -185,15 +202,16 @@ class Patient(object):
         :return: pandas dataframe.
         """
         df = pd.DataFrame(self.heartbeats)
-        print(df)
-
-
+        df.drop(columns=['cardiac_cycle'], inplace=True)
+        return df
 
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    p_100 = Patient('234')
-    p_100.get_patient_df()
+    p_100 = Patient('114')
+    df = p_100.get_patient_df()
+    # print(df)
+    print(p_100.heartbeats_summaries())
     # heartbeats = p_100.heartbeats
     #
     # logging.info("Total number of heartbeats: {}\t #N: {}\t #S: {}\t, #V: {}, #F: {}\t #Q: {}"

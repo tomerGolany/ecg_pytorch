@@ -3,7 +3,9 @@ import numpy as np
 import torch
 from ecg_pytorch.data_reader import pickle_data
 from ecg_pytorch.dynamical_model import typical_beat_params, equations
-from ecg_pytorch.data_reader import preprocess_data
+from ecg_pytorch.data_reader import ecg_mit_bih
+import logging
+
 
 class EcgHearBeatsDataset(Dataset):
     """ECG heart beats dataset."""
@@ -18,9 +20,10 @@ class EcgHearBeatsDataset(Dataset):
         # self.train, self.val, _ = pickle_data.load_ecg_input_from_pickle()
         self.one_vs_all = False
         # self.train = np.concatenate((self.train, self.val), axis=0)
-        self.train, _  = preprocess_data.build_dataset()
+        mit_bih_dataset = ecg_mit_bih.ECGMitBihDataset()
+        self.train = mit_bih_dataset.train_heartbeats
         if beat_type is not None and one_vs_all is None:
-            self.train = np.array([sample for sample in self.train if sample['beat_type'] == beat_type])
+            self.train = np.array([sample for sample in self.train if sample['aami_label_str'] == beat_type])
 
         if one_vs_all is not None:
             self.beat_type = beat_type
@@ -47,7 +50,7 @@ class EcgHearBeatsDataset(Dataset):
             weight_per_class[i] = N / float(count[i])
         weight = [0] * len(self.train)
         for idx, val in enumerate(self.train):
-            label_ind = int(np.argmax(val['label']))
+            label_ind = val['aami_label_ind']
             weight[idx] = weight_per_class[label_ind]
         return weight
 
@@ -66,7 +69,7 @@ class EcgHearBeatsDataset(Dataset):
         return len(self.train)
 
     def len_beat(self, beat_Type):
-        return len(np.array([sample for sample in self.train if sample['beat_type'] == beat_Type]))
+        return len(np.array([sample for sample in self.train if sample['aami_label_str'] == beat_Type]))
 
     def __getitem__(self, idx):
         sample = self.train[idx]
@@ -75,9 +78,9 @@ class EcgHearBeatsDataset(Dataset):
             lstm_beat = np.array([sample['cardiac_cycle'][i:i + 5] for i in range(0, 215, 5)])
         else:
             lstm_beat = sample['cardiac_cycle']
-        tag = sample['beat_type']
+        tag = sample['aami_label_str']
         if not self.one_vs_all:
-            sample = {'cardiac_cycle': lstm_beat, 'beat_type': tag, 'label': np.array(sample['label'])}
+            sample = {'cardiac_cycle': lstm_beat, 'beat_type': tag, 'label': np.array(sample['aami_label_one_hot'])}
         else:
             if tag == self.beat_type:
                 sample = {'cardiac_cycle': lstm_beat, 'beat_type': tag, 'label': np.array([1, 0])}
@@ -88,6 +91,9 @@ class EcgHearBeatsDataset(Dataset):
         return sample
 
     def add_beats_from_generator(self, generator_model, num_beats_to_add, checkpoint_path, beat_type):
+        logging.info("Adding data from generator: {}. number of beats to add: {}\t"
+                     "checkpoint path: {}\t beat type: {}".format(generator_model, num_beats_to_add, checkpoint_path,
+                                                                  beat_type))
         checkpoint = torch.load(checkpoint_path)
         generator_model.load_state_dict(checkpoint['generator_state_dict'])
         # discriminator_model.load_state_dict(checkpoint['discriminator_state_dict'])
@@ -96,7 +102,7 @@ class EcgHearBeatsDataset(Dataset):
             output_g = generator_model(input_noise)
             output_g = output_g.numpy()
             output_g = np.array(
-                [{'cardiac_cycle': x, 'beat_type': beat_type, 'label': self.beat_type_to_one_hot_label[beat_type]} for x
+                [{'cardiac_cycle': x, 'aami_label_str': beat_type, 'aami_label_one_hot': self.beat_type_to_one_hot_label[beat_type]} for x
                  in output_g])
             # plt.plot(output_g[0]['cardiac_cycle'])
             # plt.show()
@@ -152,17 +158,21 @@ def scale_signal(signal, min_val=-0.01563, max_val=0.042557):
     # scaled = [(z - zmin) * max_val / zrange + min_val for z in signal]
     return scaled
 
+
 class EcgHearBeatsDatasetTest(Dataset):
     """ECG heart beats dataset."""
 
     def __init__(self, transform=None, beat_type=None, one_vs_all=None, lstm_setting=True):
         #  _, _, self.test = pickle_data.load_ecg_input_from_pickle()
-        self.train, self.test = preprocess_data.build_dataset()
+        mit_bih_dataset = ecg_mit_bih.ECGMitBihDataset()
+        self.train = mit_bih_dataset.train_heartbeats
+        self.test = mit_bih_dataset.test_heartbeats
+
         self.test = self.test + self.train
         self.lstm_setting = lstm_setting
         self.one_vs_all = False
         if beat_type is not None and one_vs_all is None:
-            self.test = np.array([sample for sample in self.test if sample['beat_type'] == beat_type])
+            self.test = np.array([sample for sample in self.test if sample['aami_label_str'] == beat_type])
 
         if one_vs_all is not None:
             self.beat_type = beat_type
@@ -182,10 +192,10 @@ class EcgHearBeatsDatasetTest(Dataset):
             lstm_beat = np.array([sample['cardiac_cycle'][i:i + 5] for i in range(0, 215, 5)])  # [43, 5]
         else:
             lstm_beat = sample['cardiac_cycle']
-        tag = sample['beat_type']
+        tag = sample['aami_label_str']
         # sample = {'cardiac_cycle': lstm_beat, 'beat_type': tag, 'label': np.array(sample['label'])}
         if not self.one_vs_all:
-            sample = {'cardiac_cycle': lstm_beat, 'beat_type': tag, 'label': np.array(sample['label'])}
+            sample = {'cardiac_cycle': lstm_beat, 'beat_type': tag, 'label': np.array(sample['aami_label_one_hot'])}
         else:
             if tag == self.beat_type:
                 sample = {'cardiac_cycle': lstm_beat, 'beat_type': tag, 'label': np.array([1, 0])}
@@ -196,7 +206,7 @@ class EcgHearBeatsDatasetTest(Dataset):
         return sample
 
     def len_beat(self, beat_Type):
-        return len(np.array([sample for sample in self.test if sample['beat_type'] == beat_Type]))
+        return len(np.array([sample for sample in self.test if sample['aami_label_str'] == beat_Type]))
 
     def print_statistics(self):
         count = np.array([self.len_beat('N'), self.len_beat('S'), self.len_beat('V'),
