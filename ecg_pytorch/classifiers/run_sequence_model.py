@@ -28,6 +28,7 @@ def init_weights(m):
 
 
 def predict_fn(data_loader, train_config, criterion, writer, total_iters, best_auc_scores):
+    device = train_config.device
     logging.info("Performing evaluation:")
     softmax_layer = nn.Softmax(dim=1)
     with torch.no_grad():
