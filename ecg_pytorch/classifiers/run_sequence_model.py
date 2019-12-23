@@ -27,7 +27,7 @@ def init_weights(m):
         torch.nn.init.xavier_uniform(m.weight_ih_l0.data)
 
 
-def predict_fn(data_loader, train_config, criterion, writer, total_iters, best_auc_scores):
+def predict_fn(network_object, data_loader, train_config, criterion, writer, total_iters, best_auc_scores):
     device = train_config.device
     logging.info("Performing evaluation:")
     softmax_layer = nn.Softmax(dim=1)
@@ -48,7 +48,7 @@ def predict_fn(data_loader, train_config, criterion, writer, total_iters, best_a
             labels = test_data['label'].to(device)
             # logging.info("labels shape: {}. first labels in batch: {}".format(labels.shape, labels[0]))
             labels_ind = torch.max(labels, 1)[1]
-            preds_before_softmax = net(ecg_batch)
+            preds_before_softmax = network_object(ecg_batch)
             # logging.info(
             #     "output before softmax shape: {}. first in batch: {}".format(preds_before_softmax.shape,
             #                                                                  preds_before_softmax[0]))
@@ -194,7 +194,8 @@ def model_fn(network_object, model_dir, train_config=None):
                 logging.info("Norm of gradients = {}.".format(grad_norm))
 
             if total_iters % 200 == 0:
-                labels_ind_total, outputs_ind_total, labels_total_one_hot, outputs_preds = predict_fn(test_data_loader,
+                labels_ind_total, outputs_ind_total, labels_total_one_hot, outputs_preds = predict_fn(network_object,
+                                                                                                      test_data_loader,
                                                                                                       train_config,
                                                                                                       criterion, writer,
                                                                                                       total_iters,
@@ -209,7 +210,8 @@ def model_fn(network_object, model_dir, train_config=None):
                 #                 best_auc_scores,
                 #                 outputs_preds, labels_total_one_hot)
 
-        labels_ind_total, outputs_ind_total, labels_total_one_hot, outputs_preds = predict_fn(test_data_loader,
+        labels_ind_total, outputs_ind_total, labels_total_one_hot, outputs_preds = predict_fn(network_object,
+                                                                                              test_data_loader,
                                                                                               train_config, criterion,
                                                                                               writer, total_iters,
                                                                                               best_auc_scores)
@@ -226,7 +228,7 @@ def model_fn(network_object, model_dir, train_config=None):
     writer.close()
 
     torch.save({
-        'net': net.state_dict()
+        'net': network_object.state_dict()
     }, model_dir + '/checkpoint_epoch_iters_{}'.format(total_iters))
     writer.close()
 
@@ -443,20 +445,20 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=logging.INFO, handlers=[logging.FileHandler("{}/logs.log".format(model_dir)),
                                                       logging.StreamHandler()])
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    logging.info("Devices: {}".format(device))
+    main_device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    logging.info("Devices: {}".format(main_device))
 
 
 
     # net = lstm.ECGLSTM(5, 512, 2, 2).to(device)
 
-    net = deep_residual_conv.Net(2).to(device)
+    main_net = deep_residual_conv.Net(2).to(main_device)
 
-    gen_details = GeneratorAdditionalDataConfig(beat_type='S', checkpoint_path=checkpoint_paths.VGAN_S_CHK,
+    main_gen_details = GeneratorAdditionalDataConfig(beat_type='S', checkpoint_path=checkpoint_paths.VGAN_S_CHK,
                                                 num_examples_to_add=1000, gan_type=dataset_builder.GanType.VANILA_GAN)
 
     train_config_1 = ECGTrainConfig(num_epochs=15, batch_size=300, lr=0.0001, weighted_loss=False,
                                     weighted_sampling=False,
-                                    device=device, add_data_from_gan=True, generator_details=gen_details,
+                                    device=main_device, add_data_from_gan=True, generator_details=main_gen_details,
                                     train_one_vs_all=True)
-    model_fn(net, model_dir, train_config=train_config_1)
+    model_fn(main_net, model_dir, train_config=train_config_1)
