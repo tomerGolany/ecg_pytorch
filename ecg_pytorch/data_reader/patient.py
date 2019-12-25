@@ -33,10 +33,12 @@ class Patient(object):
 
         :param patient_number: string which represents the patient number.
         """
+        logging.info("Creating patient {}...".format(patient_number))
         self.patient_number = patient_number
         self.signals, self.additional_fields = self.get_raw_signals()
         self.mit_bih_labels_str, self.labels_locations, self.labels_descriptions = self.get_annotations()
         self.heartbeats = self.slice_heartbeats()
+        logging.info("Completed patient {}.\n\n".format(patient_number))
 
     @DeprecationWarning
     def read_raw_data(self):

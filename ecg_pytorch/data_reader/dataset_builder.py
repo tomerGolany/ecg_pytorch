@@ -1,6 +1,6 @@
 """Function that support building dataset for ECG heartbeats."""
 import torchvision.transforms as transforms
-from ecg_pytorch.data_reader.ecg_dataset_lstm import ToTensor, EcgHearBeatsDataset, EcgHearBeatsDatasetTest
+from ecg_pytorch.data_reader.ecg_dataset_pytorch import ToTensor, EcgHearBeatsDataset, EcgHearBeatsDatasetTest
 import torch
 import logging
 from enum import Enum
@@ -18,7 +18,7 @@ class GanType(Enum):
     NOISE = 5
 
 
-def build(train_config,):
+def build(train_config):
     """Build PyTorch train and test data-loaders.
 
     :param train_config:

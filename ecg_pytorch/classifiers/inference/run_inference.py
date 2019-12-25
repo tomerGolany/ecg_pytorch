@@ -86,6 +86,76 @@ def eval_model(model, model_chk, patient_number):
         out.release()
 
 
+class ECGInferenceOneVsAll(object):
+    def __init__(self, beat_type, model, model_chk, patient_number):
+        """Initialize a new ECGInferenceOneVsAll object.
+
+        :param beat_type: The the of beat which is classified.
+        :param model: The network object without the loaded weights.
+        :param model_chk: path to checkpoint file with weight values.
+        :param patient_number: string - number of patient from the mit-bih dataset.
+        """
+        self.beat_type = beat_type
+        self.model = model
+        self.model_chk = model_chk
+        self.patient_number = patient_number
+
+    def predict(self):
+        """Returns probability predictions from an ECG signal of a patient."""
+        logging.info("Inference model {} Vs. all".format(self.beat_type))
+        p = patient.Patient(self.patient_number)
+
+        heartbeats = p.heartbeats
+
+        checkpoint = torch.load(self.model_chk, map_location='cpu')
+        self.model.load_state_dict(checkpoint['net'])
+        self.model.eval()
+        softmax = torch.nn.Softmax()
+        predictions = []
+        ground_truths_one_hot = []
+        ground_truths_class_str = []
+        classes_ind = []
+        predicted_classes_str = []
+        cardiac_cycles = []
+        with torch.no_grad():
+            for i, beat_dict in enumerate(tqdm.tqdm(heartbeats)):
+                # logging.info("beat # {}".format(beat_dict['beat_ind']))
+                beat = torch.Tensor(beat_dict['cardiac_cycle'])
+                cardiac_cycles.append(beat.numpy())
+                model_output = self.model(beat)
+                output_probability = softmax(model_output)
+                predicted_class_ind = torch.argmax(output_probability).item()
+                if predicted_class_ind == 1:
+                    predicted_class_str = 'Other'
+                else:
+                    predicted_class_str = self.beat_type
+
+                output_probability = output_probability.numpy()
+                # logging.info("prediction: {}\t ground truth: {}".format(prediction, beat_dict['aami_label_str']))
+                predictions.append([output_probability[0][0], output_probability[0][1]])
+                classes_ind.append(predicted_class_ind)
+                predicted_classes_str.append(predicted_class_str)
+
+                if beat_dict['aami_label_str'] == self.beat_type:
+                    ground_truths_one_hot.append([1, 0])
+                    ground_truths_class_str.append("{}".format(self.beat_type))
+                else:
+                    ground_truths_one_hot.append([0, 1])
+                    ground_truths_class_str.append("Other")
+
+        return ground_truths_one_hot, predictions, classes_ind, predicted_classes_str, cardiac_cycles, \
+               ground_truths_class_str
+
+    def inference_summary_df(self):
+        ground_truths, predictions, classes_ind, predicted_classes_str, cardiac_cycles, ground_truths_class_str = \
+            self.predict()
+        df = pd.DataFrame(list(zip(ground_truths, predictions, classes_ind, predicted_classes_str,
+                                   ground_truths_class_str)),
+                          columns=['Ground Truth', 'Predictions', 'predicted class index', 'predicted class str',
+                                   'ground truth class str'])
+        return df
+
+
 def inference_one_vs_all(beat_type, model, model_chk, patient_number):
     """Returns probability predictions from an ECG signal of a patient.
 
@@ -108,13 +178,13 @@ def inference_one_vs_all(beat_type, model, model_chk, patient_number):
     ground_truths = []
     with torch.no_grad():
         for i, beat_dict in enumerate(tqdm.tqdm(heartbeats)):
-            logging.info("beat # {}".format(beat_dict['beat_ind']))
+            # logging.info("beat # {}".format(beat_dict['beat_ind']))
             beat = torch.Tensor(beat_dict['cardiac_cycle'])
 
             prediction = model(beat)
             prediction = softmax(prediction)
             prediction = prediction.numpy()
-            logging.info("prediction: {}\t ground truth: {}".format(prediction, beat_dict['aami_label_str']))
+            # logging.info("prediction: {}\t ground truth: {}".format(prediction, beat_dict['aami_label_str']))
             predictions.append([prediction[0][0], prediction[0][1]])
 
             if beat_dict['aami_label_str'] == beat_type:
@@ -153,5 +223,8 @@ if __name__ == "__main__":
     # print(preds.shape)
     # print(gts.shape)
 
-    pred_gts_df = predictions_ground_truths_data_frame('S', net, model_chk, p)
-    print(pred_gts_df)
+    # pred_gts_df = predictions_ground_truths_data_frame('S', net, model_chk, p)
+    # print(pred_gts_df)
+    ecg_inference = ECGInferenceOneVsAll('S', net, model_chk, p)
+
+    print(ecg_inference.inference_summary_df())

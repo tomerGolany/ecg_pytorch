@@ -1,4 +1,4 @@
-from ecg_pytorch.data_reader.ecg_dataset_lstm import EcgHearBeatsDataset, ToTensor
+from ecg_pytorch.data_reader.ecg_dataset_pytorch import EcgHearBeatsDataset, ToTensor
 from matplotlib import pyplot as plt
 from torchvision import transforms
 from torch.utils.data import DataLoader

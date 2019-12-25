@@ -2,6 +2,9 @@
 from enum import Enum
 
 
+OTHER_HEART_BEATS = "Others"
+
+
 class MitBihArrhythmiaHeartBeatTypes(Enum):
     """MIT-BIH Arrhythmia heartbeats annotations.
 

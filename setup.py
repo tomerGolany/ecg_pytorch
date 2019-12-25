@@ -7,7 +7,8 @@ from setuptools import find_packages
 from setuptools import setup
 
 REQUIRED_PACKAGES = ['matplotlib', 'numpy', 'bokeh', 'tensorboardX', 'sklearn', 'torchvision',
-                     'torch', 'wfdb']
+                     'torch', 'wfdb', 'google-api-python-client', 'google-auth-httplib2',
+                     'google-auth-oauthlib', 'opencv-python']
 
 setup(name='ecg_pytorch',
       version='0.1',

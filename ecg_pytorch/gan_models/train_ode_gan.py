@@ -5,7 +5,7 @@ import torch.utils.data
 import torchvision.transforms as transforms
 import numpy as np
 import matplotlib.pyplot as plt
-from ecg_pytorch.data_reader import ecg_dataset_lstm
+from ecg_pytorch.data_reader import ecg_dataset_pytorch
 from tensorboardX import SummaryWriter
 from ecg_pytorch.gan_models.models import ode_gan
 from ecg_pytorch.gan_models.models import ode_gan_aaai
@@ -215,8 +215,8 @@ def train(batch_size, num_train_steps, model_dir, beat_type):
     #
     # 1. create the ECG dataset:
     #
-    composed = transforms.Compose([ecg_dataset_lstm.Scale(), ecg_dataset_lstm.ToTensor()])
-    dataset = ecg_dataset_lstm.EcgHearBeatsDataset(transform=composed, beat_type=beat_type, lstm_setting=False)
+    composed = transforms.Compose([ecg_dataset_pytorch.Scale(), ecg_dataset_pytorch.ToTensor()])
+    dataset = ecg_dataset_pytorch.EcgHearBeatsDataset(transform=composed, beat_type=beat_type, lstm_setting=False)
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size,
                                              shuffle=True, num_workers=1)
     print("Size of real dataset is {}".format(len(dataset)))

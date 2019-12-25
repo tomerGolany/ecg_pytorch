@@ -1,7 +1,7 @@
 import pickle
 from ecg_pytorch import train_configs
 from ecg_pytorch.data_reader import ecg_mit_bih
-
+import logging
 full_path = train_configs.base + 'ecg_pytorch/ecg_pytorch/data_reader'
 
 
@@ -16,10 +16,13 @@ def load_ecg_input_from_pickle():
 
 
 def save_ecg_mit_bih_to_pickle():
+    print("start pickling:")
     with open(full_path + '/ecg_mit_bih.pickle', 'wb') as output:
         ecg_ds = ecg_mit_bih.ECGMitBihDataset()
         pickle.dump(ecg_ds, output, pickle.HIGHEST_PROTOCOL)
+        logging.info("Done pickling")
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
     save_ecg_mit_bih_to_pickle()
